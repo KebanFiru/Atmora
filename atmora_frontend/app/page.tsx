@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import LeafletMap from '../components/LeafletMapWrapper';
+import LeafletMap from '../components/LeafletMap';
 import DrawingToolbar from '../components/DrawingToolbar';
 import MapControls from '../components/MapControls';
 import HeaderButtons from '../components/HeaderButtons';
