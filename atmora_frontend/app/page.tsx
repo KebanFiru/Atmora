@@ -1,103 +1,142 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState } from 'react';
+import EsriMap from '../components/EsriMap';
+import SimpleMap from '../components/SimpleMap';
+import DrawingToolbar from '../components/DrawingToolbar';
+import MapControls from '../components/MapControls';
+import HeaderButtons from '../components/HeaderButtons';
+import WeatherForm from '../components/WeatherForm';
+import ClimateForm from '../components/ClimateForm';
+import TimeScroller from '../components/TimeScroller';
+
+interface WeatherData {
+  temperature: Array<{ date: string; value: number }>;
+  windSpeed: Array<{ date: string; value: number }>;
+  precipitation: Array<{ date: string; value: number }>;
+  humidity: Array<{ date: string; value: number }>;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedTool, setSelectedTool] = useState<'point' | 'circle' | 'rectangle' | 'polygon' | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{ longitude: number; latitude: number } | null>(null);
+  const [isWeatherFormOpen, setIsWeatherFormOpen] = useState(false);
+  const [isClimateFormOpen, setIsClimateFormOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [weatherData, setWeatherData] = useState<WeatherData | undefined>(undefined);
+  const [zoomLevel, setZoomLevel] = useState(6);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  const handleLocationSelect = (longitude: number, latitude: number, geometry?: any) => {
+    setSelectedLocation({ longitude, latitude });
+    console.log('Selected location:', { longitude, latitude, geometry });
+  };
+
+  const handleWeatherAnalysis = async (params: any) => {
+    if (!selectedLocation) return;
+
+    try {
+      const response = await fetch('/api/weather', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          longitude: selectedLocation.longitude,
+          latitude: selectedLocation.latitude,
+          startDate: params.startDate,
+          endDate: params.endDate,
+          parameters: params.parameters,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setWeatherData(result.data);
+        console.log('Weather data received:', result);
+      } else {
+        console.error('Failed to fetch weather data');
+      }
+    } catch (error) {
+      console.error('Error fetching weather data:', error);
+    }
+  };
+
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
+    console.log('Date changed:', date);
+  };
+
+  const handleDateConfirm = (date: Date) => {
+    setSelectedDate(date);
+    console.log('Date confirmed:', date);
+    // Here you could trigger map updates based on the selected date
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 1, 18));
+    console.log('Zoom in to level:', zoomLevel + 1);
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 1, 1));
+    console.log('Zoom out to level:', zoomLevel - 1);
+  };
+
+  return (
+    <div className="relative w-full h-screen overflow-hidden">
+      {/* Full-screen Map Background */}
+      <SimpleMap
+        onLocationSelect={handleLocationSelect}
+        drawingMode={selectedTool}
+        isDarkMode={isDarkMode}
+        zoom={zoomLevel}
+        onZoomChange={setZoomLevel}
+      />
+
+      {/* UI Overlays */}
+      <MapControls
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+      />
+
+      <HeaderButtons
+        onWeatherClick={() => {
+          setIsWeatherFormOpen(true);
+          setIsClimateFormOpen(false);
+        }}
+        onClimateClick={() => {
+          setIsClimateFormOpen(true);
+          setIsWeatherFormOpen(false);
+        }}
+      />
+
+      <DrawingToolbar
+        selectedTool={selectedTool}
+        onToolSelect={setSelectedTool}
+      />
+
+      <TimeScroller
+        onDateChange={handleDateChange}
+        onConfirm={handleDateConfirm}
+      />
+
+      {/* Modal Forms */}
+      <WeatherForm
+        isOpen={isWeatherFormOpen}
+        onClose={() => setIsWeatherFormOpen(false)}
+        selectedLocation={selectedLocation}
+        onAnalyze={handleWeatherAnalysis}
+        weatherData={weatherData}
+      />
+
+      <ClimateForm
+        isOpen={isClimateFormOpen}
+        onClose={() => setIsClimateFormOpen(false)}
+        selectedLocation={selectedLocation}
+      />
     </div>
   );
 }

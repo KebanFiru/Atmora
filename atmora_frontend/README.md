@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Atmora - NASA Weather Dashboard
+
+A futuristic, minimal weather analysis dashboard built for the NASA Space Apps Challenge. The application provides personalized weather insights using NASA Earth observation data to help users plan outdoor activities.
+
+## Features
+
+### 🗺️ Interactive Map Interface
+- Full-screen interactive map with drawing tools
+- Point, circle, rectangle, and polygon selection modes
+- Day/night mode toggle
+- Zoom controls
+
+### 🌤️ Weather Analysis
+- Real-time weather data from NASA POWER API
+- Analysis of extreme weather conditions:
+  - Very hot days
+  - Very cold days
+  - Very windy conditions
+  - Very wet periods
+  - Uncomfortable weather combinations
+- Customizable thresholds for weather conditions
+- Interactive charts and visualizations
+- Data export functionality (CSV format)
+
+### 🌍 Climate Overview
+- Long-term climate pattern analysis
+- Educational content about climate change
+- Regional climate data visualization
+- Monthly averages and trends
+
+### ⏰ Time Selection
+- Innovative vertical scrollbar for date selection
+- Lock mechanism design for precise date picking
+- Real-time date updates with confirmation system
+
+## Technology Stack
+
+- **Framework**: Next.js 15 with TypeScript
+- **Styling**: Tailwind CSS v4
+- **Maps**: ArcGIS JavaScript API (@arcgis/core)
+- **Charts**: Recharts
+- **Icons**: Lucide React
+- **Data Source**: NASA POWER API
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js (Latest LTS version)
+- pnpm package manager
 
+### Installation
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Start the development server:
+```bash
+pnpm dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Usage
 
-## Learn More
+### 1. Location Selection
+- Use the bottom toolbar to select your preferred drawing tool:
+  - **Point**: Click anywhere on the map to select a specific location
+  - **Circle**: Draw a circular area for regional analysis
+  - **Rectangle**: Select rectangular regions
+  - **Polygon**: Create custom shaped areas
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Weather Analysis
+- Click the "Weather" button in the top center
+- Set your analysis parameters:
+  - Date range for analysis
+  - Weather condition thresholds
+- Click "Analyze Weather Patterns" to fetch NASA data
+- View results including probability percentages and interactive charts
+- Download data as CSV for further analysis
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Climate Overview
+- Click the "Climate" button to access educational content
+- View regional climate data and trends
+- Understand long-term climate patterns
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Time Navigation
+- Use the right-side vertical scroller to change dates
+- Drag or scroll to navigate through time
+- Click "Onayla" (Confirm) to apply selected date
 
-## Deploy on Vercel
+## NASA POWER API Integration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The application integrates with NASA's POWER (Prediction Of Worldwide Energy Resources) API to fetch:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **T2M**: Temperature at 2 meters (°C)
+- **WS10M**: Wind speed at 10 meters (m/s)
+- **PRECTOT**: Total precipitation (mm/day)
+- **HUMIDITY**: Relative Humidity (%)
+
+Data is available globally with daily resolution from 1981 to near real-time.
+
+## Design Philosophy
+
+The application follows a **futuristic minimal design** approach:
+
+- **Glassmorphism effects**: Semi-transparent components with backdrop blur
+- **Rounded corners**: Soft, modern appearance
+- **Intuitive interactions**: Clear visual feedback for all user actions
+- **Responsive layout**: Works seamlessly on all device sizes
+- **Accessible design**: High contrast ratios and clear typography
+
+---
+
+**Developed for NASA Space Apps Challenge 2025**
+*Making weather data accessible for outdoor activity planning*
