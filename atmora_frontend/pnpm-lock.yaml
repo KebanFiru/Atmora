@@ -27,6 +27,9 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.1.14
+      '@types/leaflet':
+        specifier: ^1.9.20
+        version: 1.9.20
       '@types/node':
         specifier: ^20
         version: 20.19.19
@@ -346,6 +349,12 @@ packages:
 
   '@tailwindcss/postcss@4.1.14':
     resolution: {integrity: sha512-BdMjIxy7HUNThK87C7BC8I1rE8BVUsfNQSI5siQ4JK3iIa3w0XyVvVL9SXLWO//CtYTcp1v7zci0fYwJOjB+Zg==}
+
+  '@types/geojson@7946.0.16':
+    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
+
+  '@types/leaflet@1.9.20':
+    resolution: {integrity: sha512-rooalPMlk61LCaLOvBF2VIf9M47HgMQqi5xQ9QRi7c8PkdIe0WrIi5IxXUXQjAdL0c+vcQ01mYWbthzmp9GHWw==}
 
   '@types/node@20.19.19':
     resolution: {integrity: sha512-pb1Uqj5WJP7wrcbLU7Ru4QtA0+3kAXrkutGiD26wUKzSMgNNaPARTUDQmElUXp64kh3cWdou3Q0C7qwwxqSFmg==}
@@ -800,6 +809,12 @@ snapshots:
       '@tailwindcss/oxide': 4.1.14
       postcss: 8.5.6
       tailwindcss: 4.1.14
+
+  '@types/geojson@7946.0.16': {}
+
+  '@types/leaflet@1.9.20':
+    dependencies:
+      '@types/geojson': 7946.0.16
 
   '@types/node@20.19.19':
     dependencies:

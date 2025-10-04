@@ -22,10 +22,10 @@ const LeafletMap: React.FC = () => {
         scrollWheelZoom={true}
         className="h-full w-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <TileLayer
+        attribution="Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, EPA, NPS"
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+      />
       </MapContainer>
     </div>
   );

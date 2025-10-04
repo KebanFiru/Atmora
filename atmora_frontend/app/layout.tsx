@@ -7,12 +7,11 @@ export const metadata = {
   description: "Atmora Weather App",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout() {
   return (
     <html lang="en">
       <body>
         <Main/>
-        {children}
       </body>
     </html>
   );
