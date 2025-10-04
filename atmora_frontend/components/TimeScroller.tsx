@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Calendar } from 'lucide-react';
+import { Check, Calendar, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface TimeScrollerProps {
   onDateChange: (date: Date) => void;
@@ -10,162 +10,154 @@ interface TimeScrollerProps {
 
 const TimeScroller: React.FC<TimeScrollerProps> = ({ onDateChange, onConfirm }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [isDragging, setIsDragging] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const startPosRef = useRef(0);
-  const startDateRef = useRef(new Date());
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
 
-  // Generate date range (1 year from now)
-  const generateDates = () => {
-    const dates = [];
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 180); // 6 months back
-    
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+  
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
   };
 
-  const dates = generateDates();
-  const currentIndex = dates.findIndex(date => 
-    date.toDateString() === selectedDate.toDateString()
-  );
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    startPosRef.current = e.clientY;
-    startDateRef.current = selectedDate;
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-
-    const deltaY = e.clientY - startPosRef.current;
-    const daysDelta = Math.round(deltaY / 20); // 20px per day
-    
-    const newIndex = Math.max(0, Math.min(dates.length - 1, 
-      dates.findIndex(date => date.toDateString() === startDateRef.current.toDateString()) + daysDelta
-    ));
-    
-    const newDate = dates[newIndex];
-    setSelectedDate(newDate);
-    onDateChange(newDate);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const direction = e.deltaY > 0 ? 1 : -1;
-    const newIndex = Math.max(0, Math.min(dates.length - 1, currentIndex + direction));
-    const newDate = dates[newIndex];
-    setSelectedDate(newDate);
-    onDateChange(newDate);
+  const handleDateSelect = (year: number, month: number, day: number) => {
+    const newDate = new Date(year, month, day);
+    setTempDate(newDate);
   };
 
   const handleConfirm = () => {
-    onConfirm(selectedDate);
+    setSelectedDate(tempDate);
+    onDateChange(tempDate);
+    onConfirm(tempDate);
+    setIsOpen(false);
   };
 
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'grabbing';
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.cursor = 'default';
-      };
-    }
-  }, [isDragging]);
+  const quickDateChange = (days: number) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+    onDateChange(newDate);
+  };
+
+
 
   return (
     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
-      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
-        {/* Date Display */}
-        <div className="p-4 border-b border-gray-200 text-center">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden min-w-[180px]">
+        {/* Current Date Display */}
+        <div 
+          className="p-4 text-center cursor-pointer hover:bg-gray-50/80 transition-colors"
+          onClick={() => setIsOpen(!isOpen)}
+        >
           <div className="flex items-center justify-center mb-2">
-            <Calendar size={20} className="text-gray-600 mr-2" />
-            <span className="font-semibold text-gray-800">Date Selector</span>
+            <Calendar size={18} className="text-gray-500 mr-2" />
+            <span className="text-sm font-medium text-gray-700">Selected Date</span>
           </div>
-          <div className="text-lg font-bold text-blue-600">
+          
+          <div className="text-lg font-bold text-gray-900">
             {selectedDate.toLocaleDateString('en-US', { 
               month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
+              day: 'numeric',
+              year: 'numeric'
             })}
           </div>
-          <div className="text-sm text-gray-500">
+          
+          <div className="text-xs text-gray-500 mt-1">
             {selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}
           </div>
+          
+          <ChevronDown 
+            size={16} 
+            className={`mx-auto mt-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          />
         </div>
 
-        {/* Scroll Track */}
-        <div className="relative">
-          <div
-            ref={scrollRef}
-            className={`w-16 h-80 relative overflow-hidden ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-            onMouseDown={handleMouseDown}
-            onWheel={handleWheel}
-            style={{ userSelect: 'none' }}
-          >
-            {/* Background Track */}
-            <div className="absolute inset-x-0 top-0 bottom-0 bg-gradient-to-b from-gray-100 via-gray-200 to-gray-100" />
-            
-            {/* Tick Marks */}
-            <div className="absolute inset-0">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute left-2 right-2 border-t border-gray-400"
-                  style={{ top: `${(i / 19) * 100}%` }}
-                />
-              ))}
-            </div>
-
-            {/* Handle */}
-            <div
-              className="absolute left-1 right-1 h-8 bg-blue-600 rounded-full shadow-lg border-2 border-white transition-all duration-150"
-              style={{
-                top: `${(currentIndex / (dates.length - 1)) * (100 - 10)}%`,
-                transform: isDragging ? 'scale(1.1)' : 'scale(1)'
-              }}
-            >
-              <div className="w-full h-full bg-gradient-to-b from-blue-400 to-blue-600 rounded-full" />
-            </div>
-
-            {/* Center Line */}
-            <div className="absolute left-0 right-0 top-1/2 transform -translate-y-0.5 h-0.5 bg-blue-600 opacity-50" />
-          </div>
-
-          {/* Lock Mechanism Visual */}
-          <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-gray-400 via-gray-600 to-gray-400" />
-          <div className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gray-400 via-gray-600 to-gray-400" />
-        </div>
-
-        {/* Confirm Button */}
-        <div className="p-4 border-t border-gray-200">
+        {/* Quick Actions */}
+        <div className="px-4 pb-3 flex gap-2">
           <button
-            onClick={handleConfirm}
-            className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+            onClick={() => quickDateChange(-7)}
+            className="flex-1 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
           >
-            <Check size={16} />
-            Onayla
+            -7d
+          </button>
+          <button
+            onClick={() => quickDateChange(-1)}
+            className="flex-1 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            -1d
+          </button>
+          <button
+            onClick={() => quickDateChange(1)}
+            className="flex-1 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            +1d
+          </button>
+          <button
+            onClick={() => quickDateChange(7)}
+            className="flex-1 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            +7d
           </button>
         </div>
 
-        {/* Instructions */}
-        <div className="p-3 bg-gray-50 text-xs text-gray-600 text-center">
-          <div>Scroll or drag to change date</div>
-          <div>Click confirm to apply</div>
-        </div>
+        {/* Date Picker (Expandable) */}
+        {isOpen && (
+          <div className="border-t border-gray-200/50 p-4 bg-gray-50/50">
+            {/* Year/Month Selector */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <select
+                value={tempDate.getFullYear()}
+                onChange={(e) => handleDateSelect(parseInt(e.target.value), tempDate.getMonth(), tempDate.getDate())}
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {years.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+              
+              <select
+                value={tempDate.getMonth()}
+                onChange={(e) => handleDateSelect(tempDate.getFullYear(), parseInt(e.target.value), tempDate.getDate())}
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {months.map((month, idx) => (
+                  <option key={idx} value={idx}>{month}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Day Selector */}
+            <div className="grid grid-cols-7 gap-1 mb-3">
+              {Array.from({ length: getDaysInMonth(tempDate.getFullYear(), tempDate.getMonth()) }, (_, i) => i + 1).map(day => (
+                <button
+                  key={day}
+                  onClick={() => handleDateSelect(tempDate.getFullYear(), tempDate.getMonth(), day)}
+                  className={`p-1.5 text-xs rounded transition-colors ${
+                    tempDate.getDate() === day 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white hover:bg-blue-50 text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+            
+            {/* Apply Button */}
+            <button
+              onClick={handleConfirm}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              <Check size={16} />
+              Apply Date
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -34,7 +34,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
   const [formData, setFormData] = useState<WeatherAnalysisParams>({
     startDate: '2025-01-01',
     endDate: '2025-12-31',
-    parameters: ['T2M', 'WS10M', 'PRECTOT', 'HUMIDITY'],
+    parameters: ['T2M', 'WS10M', 'PRECTOT', 'HUMIDITY']
   });
 
   const [analysisResults, setAnalysisResults] = useState<any>(null);
@@ -137,6 +137,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                   />
                 </div>
               </div>
+
               <div className="flex gap-4">
                 <button
                   type="submit"
@@ -193,7 +194,11 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
             {weatherData && (
               <div className="mt-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend</h3>
-                <div className="h-64">
+                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                  <div className="text-gray-500">
+                    <div className="text-lg font-medium mb-2">Chart Coming Soon</div>
+                    <div className="text-sm">Temperature trend visualization will be displayed here</div>
+                  </div>
                 </div>
               </div>
             )}
