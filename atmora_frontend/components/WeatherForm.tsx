@@ -32,8 +32,8 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
   weatherData 
 }) => {
   const [formData, setFormData] = useState<WeatherAnalysisParams>({
-    startDate: '2025-01-01',
-    endDate: '2025-12-31',
+    startDate: '2024-01-01',
+    endDate: '2024-12-31',
     parameters: ['T2M', 'WS10M', 'PRECTOT', 'HUMIDITY'],
   });
 
