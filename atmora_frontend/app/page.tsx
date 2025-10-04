@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import EsriMap from '../components/EsriMap';
-import SimpleMap from '../components/SimpleMap';
+import LeafletMap from '../components/LeafletMapWrapper';
 import DrawingToolbar from '../components/DrawingToolbar';
 import MapControls from '../components/MapControls';
 import HeaderButtons from '../components/HeaderButtons';
@@ -86,7 +85,7 @@ export default function Home() {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* Full-screen Map Background */}
-      <SimpleMap
+      <LeafletMap
         onLocationSelect={handleLocationSelect}
         drawingMode={selectedTool}
         isDarkMode={isDarkMode}

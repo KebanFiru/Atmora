@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
