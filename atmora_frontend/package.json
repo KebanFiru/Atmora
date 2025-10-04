@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "geist": "^1.5.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.544.0",
