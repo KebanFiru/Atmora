@@ -10,7 +10,9 @@ import L from 'leaflet';
 import { MapPin } from 'lucide-react';
 import ReactDOMServer from 'react-dom/server';
 
+
 import MarkerSelector from './MarkerSelector';
+import SquareSelector from './SquareSelector';
 
 const iconMarkup = ReactDOMServer.renderToStaticMarkup(
   <MapPin size={32} color="red" />
@@ -23,7 +25,12 @@ const markerIcon = L.divIcon({
   iconAnchor: [16, 32],
 });
 
-const LeafletMap: React.FC = () => {
+
+interface LeafletMapProps {
+  mode: 'marker' | 'square';
+}
+
+const LeafletMap: React.FC<LeafletMapProps> = ({ mode }) => {
   const [markerPosition, setMarkerPosition] = useState<[number, number]>([37.7749, -122.4194]);
 
   return (
@@ -37,11 +44,15 @@ const LeafletMap: React.FC = () => {
         attribution="Tiles &copy; Esri"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
       />
-      <MarkerSelector
-        position={markerPosition}
-        setPosition={setMarkerPosition}
-        icon={markerIcon}
-      />
+      {mode === 'marker' ? (
+        <MarkerSelector
+          position={markerPosition}
+          setPosition={setMarkerPosition}
+          icon={markerIcon}
+        />
+      ) : (
+        <SquareSelector />
+      )}
     </MapContainer>
   );
 };

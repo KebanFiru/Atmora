@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import LeafletMap from './LeafletMap';
-import SquareSelector from './SquareSelector';
+import dynamic from 'next/dynamic';
 
-export default function SelectorSwitch() {
+const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
+
+export default function SelectorSelector() {
   const [mode, setMode] = useState<'marker' | 'square'>('marker');
 
   return (
@@ -25,7 +26,7 @@ export default function SelectorSwitch() {
       </div>
 
       <div className="flex-grow">
-        {mode === 'marker' ? <LeafletMap /> : <SquareSelector />}
+        <LeafletMap mode={mode} />
       </div>
     </div>
   );
