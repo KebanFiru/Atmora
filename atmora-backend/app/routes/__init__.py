@@ -1,8 +1,12 @@
-'''from .hello import hello_bp
-from .users import users_bp
-from .products import products_bp
+from .date.routers import date_bp
+from .location.routers import location_bp
+
 
 def register_routes(app):
-    app.register_blueprint(hello_bp, url_prefix='/api')
-    app.register_blueprint(users_bp, url_prefix='/api/users')
-    app.register_blueprint(products_bp, url_prefix='/api/products')'''
+    """Register blueprints for the application.
+
+    This function centralises all blueprint registration so the app factory
+    in `app/__init__.py` can simply call `register_routes(app)`.
+    """
+    app.register_blueprint(date_bp, url_prefix='/api/date')
+    app.register_blueprint(location_bp, url_prefix='/api/location')
