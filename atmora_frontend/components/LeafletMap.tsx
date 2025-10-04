@@ -51,7 +51,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ mode }) => {
           icon={markerIcon}
         />
       ) : (
-        <SquareSelector />
+        <SquareSelector icon={markerIcon}/>
       )}
     </MapContainer>
   );
