@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Download, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, TrendingUp, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { WeatherAnalysisAPI, WeatherSummary, ProgressResponse } from '../lib/weather-api';
 
 interface WeatherFormProps {
   isOpen: boolean;
   onClose: () => void;
   selectedLocation: { longitude: number; latitude: number } | null;
-  onAnalyze: (params: WeatherAnalysisParams) => void;
-  weatherData?: WeatherData;
+  onAnalyze?: (params: WeatherAnalysisParams) => void;
 }
 
 interface WeatherAnalysisParams {
@@ -17,19 +17,11 @@ interface WeatherAnalysisParams {
   parameters: string[];
 }
 
-interface WeatherData {
-  temperature: Array<{ date: string; value: number }>;
-  windSpeed: Array<{ date: string; value: number }>;
-  precipitation: Array<{ date: string; value: number }>;
-  humidity: Array<{ date: string; value: number }>;
-}
-
 const WeatherForm: React.FC<WeatherFormProps> = ({ 
   isOpen, 
   onClose, 
-  selectedLocation, 
-  onAnalyze,
-  weatherData 
+  selectedLocation,
+  onAnalyze
 }) => {
   const [formData, setFormData] = useState<WeatherAnalysisParams>({
     startDate: '2025-01-01',
@@ -37,48 +29,108 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
     parameters: ['T2M', 'WS10M', 'PRECTOT', 'HUMIDITY']
   });
 
-  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<WeatherSummary | null>(null);
+  const [charts, setCharts] = useState<{ weather_chart: string; statistics_chart: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const api = new WeatherAnalysisAPI();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedLocation) {
-      onAnalyze(formData);
-      
-      // Mock analysis results for demonstration
-      setAnalysisResults({
-        veryHot: 35,
-        veryCold: 12,
-        veryWindy: 28,
-        veryWet: 45,
-        veryUncomfortable: 22
+    if (!selectedLocation) return;
+
+    setIsAnalyzing(true);
+    setError(null);
+    setAnalysisResults(null);
+    setCharts(null);
+
+    try {
+      // Start analysis
+      const response = await api.startAnalysis({
+        latitude: selectedLocation.latitude,
+        longitude: selectedLocation.longitude,
+        startDate: formData.startDate,
+        endDate: formData.endDate
       });
+
+      setCurrentTaskId(response.task_id);
+      
+      // Call parent callback if provided
+      if (onAnalyze) {
+        onAnalyze(formData);
+      }
+
+      // Start polling for progress
+      pollProgress(response.task_id);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+      setIsAnalyzing(false);
     }
   };
 
-  const downloadData = () => {
-    if (weatherData && selectedLocation) {
-      const csvData = generateCSV(weatherData, selectedLocation);
-      const blob = new Blob([csvData], { type: 'text/csv' });
+  const pollProgress = async (taskId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const progressData = await api.getProgress(taskId);
+        setProgress(progressData);
+
+        if (progressData.completed) {
+          clearInterval(pollInterval);
+          setIsAnalyzing(false);
+          
+          if (progressData.summary) {
+            setAnalysisResults(progressData.summary);
+          }
+          
+          if (progressData.charts) {
+            setCharts(progressData.charts);
+          }
+        }
+
+        if (progressData.error) {
+          clearInterval(pollInterval);
+          setError(progressData.error);
+          setIsAnalyzing(false);
+        }
+
+      } catch (err) {
+        clearInterval(pollInterval);
+        setError(err instanceof Error ? err.message : 'Failed to get progress');
+        setIsAnalyzing(false);
+      }
+    }, 2000);
+  };
+
+  const downloadData = async (format: 'csv' | 'json') => {
+    if (!currentTaskId) return;
+
+    try {
+      const blob = await api.exportData(currentTaskId, format);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `weather_data_${selectedLocation.latitude}_${selectedLocation.longitude}.csv`;
+      a.download = `atmora_weather_data_${selectedLocation?.latitude}_${selectedLocation?.longitude}.${format}`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed');
     }
   };
 
-  const generateCSV = (data: WeatherData, location: { longitude: number; latitude: number }) => {
-    const headers = ['Date', 'Temperature (°C)', 'Wind Speed (m/s)', 'Precipitation (mm)', 'Humidity (%)'];
-    const rows = data.temperature.map((temp, index) => [
-      temp.date,
-      temp.value,
-      data.windSpeed[index]?.value || '',
-      data.precipitation[index]?.value || '',
-      data.humidity[index]?.value || ''
-    ]);
-    
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (currentTaskId && !isAnalyzing) {
+        api.cleanupTask(currentTaskId).catch(console.error);
+      }
+    };
+  }, [currentTaskId, isAnalyzing]);
 
   if (!isOpen) return null;
 
@@ -141,63 +193,178 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  disabled={!selectedLocation}
+                  disabled={!selectedLocation || isAnalyzing}
                   className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
                 >
-                  <TrendingUp size={20} className="inline mr-2" />
-                  Analyze Weather Patterns
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 size={20} className="inline mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp size={20} className="inline mr-2" />
+                      Analyze Weather Patterns
+                    </>
+                  )}
                 </button>
                 
-                {weatherData && (
-                  <button
-                    type="button"
-                    onClick={downloadData}
-                    className="bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                  >
-                    <Download size={20} className="inline mr-2" />
-                    Download Data
-                  </button>
+                {analysisResults && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadData('csv')}
+                      className="bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      <Download size={20} className="inline mr-2" />
+                      CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadData('json')}
+                      className="bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    >
+                      <Download size={20} className="inline mr-2" />
+                      JSON
+                    </button>
+                  </div>
                 )}
               </div>
             </form>
 
+            {/* Progress Display */}
+            {isAnalyzing && progress && (
+              <div className="mt-8 p-6 bg-blue-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  <Loader2 size={20} className="inline mr-2 animate-spin" />
+                  Analysis in Progress
+                </h3>
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>{progress.status}</span>
+                    <span>{progress.percentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress.percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Elapsed time: {Math.floor(progress.elapsed_time / 60)}m {progress.elapsed_time % 60}s
+                </div>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="mt-8 p-6 bg-red-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-red-800 mb-2">
+                  <AlertCircle size={20} className="inline mr-2" />
+                  Analysis Error
+                </h3>
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+
             {/* Analysis Results */}
             {analysisResults && (
-              <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Analysis Results</h3>
-                <div className="grid grid-cols-5 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{analysisResults.veryHot}%</div>
-                    <div className="text-sm text-gray-600">Very Hot Days</div>
+              <div className="mt-8 space-y-6">
+                {/* Success Header */}
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">
+                    <CheckCircle2 size={20} className="inline mr-2" />
+                    Analysis Complete!
+                  </h3>
+                  <p className="text-sm text-green-700">{analysisResults.recommendation}</p>
+                </div>
+
+                {/* Weather Highlights */}
+                <div className="p-6 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Weather Highlights</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-orange-600">{analysisResults.weather_highlights.average_temperature}</div>
+                      <div className="text-sm text-gray-600">Average Temperature</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">{analysisResults.weather_highlights.average_humidity}</div>
+                      <div className="text-sm text-gray-600">Average Humidity</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-green-600">{analysisResults.weather_highlights.average_wind_speed}</div>
+                      <div className="text-sm text-gray-600">Average Wind Speed</div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{analysisResults.veryCold}%</div>
-                    <div className="text-sm text-gray-600">Very Cold Days</div>
+                </div>
+
+                {/* Risk Assessment */}
+                <div className="p-6 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Risk Assessment</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">{analysisResults.risk_assessment.very_hot_days}</div>
+                      <div className="text-sm text-gray-600">Very Hot Days</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{analysisResults.risk_assessment.very_cold_days}</div>
+                      <div className="text-sm text-gray-600">Very Cold Days</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{analysisResults.risk_assessment.very_windy_days}</div>
+                      <div className="text-sm text-gray-600">Very Windy Days</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-cyan-600">{analysisResults.risk_assessment.very_wet_days}</div>
+                      <div className="text-sm text-gray-600">Very Wet Days</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">{analysisResults.risk_assessment.uncomfortable_days}</div>
+                      <div className="text-sm text-gray-600">Uncomfortable Days</div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{analysisResults.veryWindy}%</div>
-                    <div className="text-sm text-gray-600">Very Windy Days</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-cyan-600">{analysisResults.veryWet}%</div>
-                    <div className="text-sm text-gray-600">Very Wet Days</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">{analysisResults.veryUncomfortable}%</div>
-                    <div className="text-sm text-gray-600">Uncomfortable Days</div>
+                </div>
+
+                {/* Overview */}
+                <div className="p-6 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Analysis Overview</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Location:</span> {analysisResults.overview.location}
+                    </div>
+                    <div>
+                      <span className="font-medium">Date Range:</span> {analysisResults.overview.date_range}
+                    </div>
+                    <div>
+                      <span className="font-medium">Total Days:</span> {analysisResults.overview.total_days}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Chart */}
-            {weatherData && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend</h3>
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  <div className="text-gray-500">
-                    <div className="text-lg font-medium mb-2">Chart Coming Soon</div>
-                    <div className="text-sm">Temperature trend visualization will be displayed here</div>
+            {/* Charts */}
+            {charts && (
+              <div className="mt-8 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Weather Analysis Charts</h3>
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <img 
+                      src={`data:image/png;base64,${charts.weather_chart}`}
+                      alt="Weather Analysis Chart"
+                      className="w-full h-auto"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Statistics Chart</h3>
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <img 
+                      src={`data:image/png;base64,${charts.statistics_chart}`}
+                      alt="Statistics Chart"
+                      className="w-full h-auto"
+                    />
                   </div>
                 </div>
               </div>
