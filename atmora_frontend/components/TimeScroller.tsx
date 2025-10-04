@@ -87,7 +87,7 @@ const TimeScroller: React.FC<TimeScrollerProps> = ({ onDateChange, onConfirm }) 
   }, [isDragging]);
 
   return (
-    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10">
+    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
       <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
         {/* Date Display */}
         <div className="p-4 border-b border-gray-200 text-center">

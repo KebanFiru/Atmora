@@ -10,7 +10,7 @@ interface HeaderButtonsProps {
 
 const HeaderButtons: React.FC<HeaderButtonsProps> = ({ onWeatherClick, onClimateClick }) => {
   return (
-    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
       <div className="flex gap-4">
         <button
           onClick={onWeatherClick}

@@ -17,7 +17,7 @@ const DrawingToolbar: React.FC<DrawingToolbarProps> = ({ selectedTool, onToolSel
   ] as const;
 
   return (
-    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20">
       <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-3 shadow-2xl border border-white/20">
         <div className="flex items-center gap-2">
           {tools.map((tool) => {

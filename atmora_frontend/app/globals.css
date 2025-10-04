@@ -66,3 +66,12 @@ html, body, #__next {
   margin: 0;
   padding: 0;
 }
+
+/* Ensure Leaflet map stays behind UI elements */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+.leaflet-control-container {
+  z-index: 2 !important;
+}
