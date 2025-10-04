@@ -1,33 +1,48 @@
-'use client'; 
+// LeafletMap.tsx (Marker selector için)
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+'use client';
+
+import { useState } from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+import { MapPin } from 'lucide-react';
+import ReactDOMServer from 'react-dom/server';
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+import MarkerSelector from './MarkerSelector';
+
+const iconMarkup = ReactDOMServer.renderToStaticMarkup(
+  <MapPin size={32} color="red" />
+);
+
+const markerIcon = L.divIcon({
+  html: iconMarkup,
+  className: '',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 });
 
-
 const LeafletMap: React.FC = () => {
+  const [markerPosition, setMarkerPosition] = useState<[number, number]>([37.7749, -122.4194]);
+
   return (
-    <div className="h-[100vh] w-full rounded-lg shadow-lg overflow-hidden">
-      <MapContainer
-        center={[0,0]}
-        zoom={8}
-        scrollWheelZoom={true}
-        className="h-full w-full"
-      >
+    <MapContainer
+      center={markerPosition}
+      zoom={13}
+      scrollWheelZoom={true}
+      className="h-[100vh] w-full"
+    >
       <TileLayer
-        attribution="Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, EPA, NPS"
+        attribution="Tiles &copy; Esri"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
       />
-      </MapContainer>
-    </div>
+      <MarkerSelector
+        position={markerPosition}
+        setPosition={setMarkerPosition}
+        icon={markerIcon}
+      />
+    </MapContainer>
   );
 };
 
