@@ -1,20 +1,13 @@
-from flask import Flask, render_template, request, jsonify, send_file, make_response
 import threading
 import uuid
-import time
 from main import get_area_average, create_weather_charts
-import base64
-import io
 import matplotlib
-matplotlib.use('Agg')  # GUI olmayan backend kullan
+matplotlib.use('Agg')
 import csv
 import json
 from datetime import datetime
 import os
 
-app = Flask(__name__)
-
-# Global değişkenler
 active_tasks = {}
 
 class ProgressTracker:
@@ -22,14 +15,14 @@ class ProgressTracker:
         self.task_id = task_id
         self.progress = 0
         self.total = 0
-        self.status = "başlıyor"
+        self.status = "starting"
         self.result = None
         self.error = None
 
     def update(self, current, total):
         self.progress = current
         self.total = total
-        self.status = f"{current}/{total} tamamlandı"
+        self.status = f"{current}/{total} completed"
 
 @app.route('/')
 def index():
@@ -39,39 +32,34 @@ def index():
 def analyze_weather():
     try:
         data = request.json
-        
-        # Veriyi doğrula
+
         required_fields = ['lat_min', 'lat_max', 'lon_min', 'lon_max', 'start_date', 'end_date']
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'Eksik alan: {field}'}), 400
-        
-        # Task ID oluştur
+                return jsonify({'error': f'Missing field: {field}'}), 400
+
         task_id = str(uuid.uuid4())
-        
-        # Progress tracker oluştur
         tracker = ProgressTracker(task_id)
         active_tasks[task_id] = tracker
-        
-        # Arkaplan thread başlat
+
         thread = threading.Thread(
             target=process_weather_data,
             args=(data, tracker)
         )
         thread.start()
-        
+
         return jsonify({
             'task_id': task_id,
-            'status': 'başladı'
+            'status': 'started'
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 def process_weather_data(data, tracker):
     try:
-        tracker.status = "veri toplama başlıyor"
-        
+        tracker.status = "collecting data"
+
         result = get_area_average(
             data['lat_min'], data['lat_max'],
             data['lon_min'], data['lon_max'],
@@ -79,32 +67,32 @@ def process_weather_data(data, tracker):
             step=data.get('step', 1.0),
             progress_callback=tracker.update
         )
-        
-        tracker.status = "grafikler oluşturuluyor"
+
+        tracker.status = "creating charts"
         chart_paths = create_weather_charts(result)
-        
+
         result['chart_paths'] = chart_paths
         tracker.result = result
-        tracker.status = "tamamlandı"
-        
+        tracker.status = "completed"
+
     except Exception as e:
         tracker.error = str(e)
-        tracker.status = "hata"
+        tracker.status = "error"
 
 @app.route('/api/progress/<task_id>')
 def get_progress(task_id):
     if task_id not in active_tasks:
-        return jsonify({'error': 'Task bulunamadı'}), 404
-    
+        return jsonify({'error': 'Task not found'}), 404
+
     tracker = active_tasks[task_id]
-    
+
     response = {
         'progress': tracker.progress,
         'total': tracker.total,
         'status': tracker.status,
         'percentage': (tracker.progress / tracker.total * 100) if tracker.total > 0 else 0
     }
-    
+
     if tracker.result:
         response['result'] = {
             'statistics': tracker.result['statistics'],
@@ -112,10 +100,10 @@ def get_progress(task_id):
             'date_range': tracker.result['date_range'],
             'coordinates': tracker.result['coordinates']
         }
-        
+
     if tracker.error:
         response['error'] = tracker.error
-    
+
     return jsonify(response)
 
 @app.route('/api/chart/<path:filename>')
@@ -129,32 +117,31 @@ def serve_chart(filename):
 def cleanup_task(task_id):
     if task_id in active_tasks:
         del active_tasks[task_id]
-    return jsonify({'status': 'temizlendi'})
+    return jsonify({'status': 'cleaned'})
 
 @app.route('/api/export/<task_id>/<format>')
 def export_data(task_id, format):
     if task_id not in active_tasks:
-        return jsonify({'error': 'Task bulunamadı'}), 404
-    
+        return jsonify({'error': 'Task not found'}), 404
+
     tracker = active_tasks[task_id]
     if not tracker.result:
-        return jsonify({'error': 'Veri henüz hazır değil'}), 400
-    
+        return jsonify({'error': 'Data not ready yet'}), 400
+
     try:
         if format.lower() == 'json':
             return export_json(tracker.result, task_id)
         elif format.lower() == 'csv':
             return export_csv(tracker.result, task_id)
         else:
-            return jsonify({'error': 'Desteklenmeyen format'}), 400
+            return jsonify({'error': 'Unsupported format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 def export_json(result, task_id):
-    """JSON formatında export"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"nasa_weather_analysis_{task_id[:8]}_{timestamp}.json"
-    
+
     export_data = {
         'metadata': {
             'export_time': datetime.now().isoformat(),
@@ -165,41 +152,35 @@ def export_json(result, task_id):
         },
         'statistics': result['statistics'],
         'risk_analysis': result['risk_analysis'],
-        'raw_data': result['all_data']  # Tüm veriyi export et
+        'raw_data': result['all_data']
     }
-    
-    # Temporary file oluştur
+
     temp_path = f"temp_{filename}"
     with open(temp_path, 'w') as f:
         json.dump(export_data, f, indent=2, ensure_ascii=False)
-    
+
     def remove_file(response):
         try:
             os.remove(temp_path)
         except:
             pass
         return response
-    
+
     response = send_file(temp_path, as_attachment=True, download_name=filename)
     response.call_on_close(lambda: remove_file(response))
     return response
 
 def export_csv(result, task_id):
-    """CSV formatında export"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"nasa_weather_data_{task_id[:8]}_{timestamp}.csv"
-    
-    # Temporary file oluştur
+
     temp_path = f"temp_{filename}"
-    
+
     with open(temp_path, 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['date', 'latitude', 'longitude', 'temperature', 'wind_speed', 'precipitation', 'humidity']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
-        # Header
         writer.writeheader()
-        
-        # Data
+
         for point in result['all_data']:
             writer.writerow({
                 'date': point['date'],
@@ -210,19 +191,19 @@ def export_csv(result, task_id):
                 'precipitation': point['precipitation'],
                 'humidity': point['humidity']
             })
-    
+
     def remove_file(response):
         try:
             os.remove(temp_path)
         except:
             pass
         return response
-    
+
     response = send_file(temp_path, as_attachment=True, download_name=filename)
     response.call_on_close(lambda: remove_file(response))
     return response
 
 if __name__ == '__main__':
-    print("🌍 NASA Weather Analysis Web Server Başlatılıyor...")
-    print("📱 Tarayıcınızda http://localhost:5000 adresini açın")
+    print("🌍 NASA Weather Analysis Web Server Starting...")
+    print("📱 Open http://localhost:5000 in your browser")
     app.run(debug=True, host='0.0.0.0', port=5000)
