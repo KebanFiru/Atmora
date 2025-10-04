@@ -1,19 +1,17 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import 'leaflet/dist/leaflet.css'; // ✅ Leaflet CSS
+import './globals.css';            // ✅ Tailwind CSS
+
+import type { Metadata } from 'next';
 
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
