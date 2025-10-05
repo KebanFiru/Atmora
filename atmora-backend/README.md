@@ -4,27 +4,27 @@ A Flask-based backend service that integrates with NASA POWER API to provide wea
 
 ## Features
 
-🌍 **NASA Earth Observation Data Integration**
+ **NASA Earth Observation Data Integration**
 - Real-time weather data from NASA POWER API
 - Temperature, wind speed, precipitation, humidity analysis
 - Intelligent caching system for improved performance
 
-📊 **Advanced Weather Analysis**
+ **Advanced Weather Analysis**
 - Risk assessment for extreme weather conditions
 - Statistical analysis with min/max/average calculations
 - User-friendly weather summaries and recommendations
 
-📈 **Data Visualization**
+ **Data Visualization**
 - Automatic chart generation using matplotlib
 - Weather trend analysis with time series plots
 - Statistical charts for comprehensive overview
 
-💾 **Data Export**
+ **Data Export**
 - CSV export for spreadsheet analysis
 - JSON export for programmatic use
 - Downloadable analysis reports
 
-⚡ **Performance Optimizations**
+ **Performance Optimizations**
 - Adaptive rate limiting for NASA API
 - Intelligent caching system
 - Background processing with progress tracking
