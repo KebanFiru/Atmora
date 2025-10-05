@@ -51,17 +51,17 @@ def analyze_weather():
         required_fields = ['latitude', 'longitude', 'startDate', 'endDate']
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'Eksik alan: {field}'}), 400
+                return jsonify({'error': f'Missing are: {field}'}), 400
         
         try:
             start_date = datetime.strptime(data['startDate'], '%Y-%m-%d')
             end_date = datetime.strptime(data['endDate'], '%Y-%m-%d')
             
             if start_date > end_date:
-                return jsonify({'error': 'Başlangıç tarihi bitiş tarihinden sonra olamaz'}), 400
+                return jsonify({'error': 'Start date cannot be later than the end date.'}), 400
             
             if (end_date - start_date).days > 365:
-                return jsonify({'error': 'Maksimum 1 yıllık veri analizi yapılabilir'}), 400
+                return jsonify({'error': 'Only 1 year of data analysis can be done'}), 400
                 
         except ValueError:
             return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
@@ -93,7 +93,7 @@ def analyze_weather():
         return jsonify({
             'task_id': task_id,
             'status': 'started',
-            'message': 'Hava durumu analizi başlatıldı'
+            'message': 'Starting weather analysis'
         })
         
     except Exception as e:
@@ -102,7 +102,7 @@ def analyze_weather():
 def process_weather_data(data, tracker):
     """Background task for processing weather data"""
     try:
-        tracker.status = "NASA API'den veri toplama starting"
+        tracker.status = "Data collection from NASA API's starting"
         
         result = get_point_data_for_period(
             data['latitude'], data['longitude'],
@@ -110,7 +110,7 @@ def process_weather_data(data, tracker):
             progress_callback=tracker.update
         )
         
-        tracker.status = "grafikler oluşturuluyor"
+        tracker.status = "Creating graphics"
         
         charts = create_weather_charts(result)
         result['charts'] = charts
@@ -198,7 +198,7 @@ def get_result(task_id):
     tracker = active_tasks[task_id]
     
     if not tracker.result:
-        return jsonify({'error': 'Analiz henüz tamamlanmadı'}), 400
+        return jsonify({'error': 'Analysis has not been completed yet'}), 400
     
     if tracker.error:
         return jsonify({'error': tracker.error}), 500
@@ -217,7 +217,7 @@ def export_data(task_id, format):
     
     tracker = active_tasks[task_id]
     if not tracker.result:
-        return jsonify({'error': 'Veri henüz hazır değil'}), 400
+        return jsonify({'error': 'Data is not ready yet'}), 400
     
     try:
         if format.lower() == 'json':
@@ -225,7 +225,7 @@ def export_data(task_id, format):
         elif format.lower() == 'csv':
             return export_csv(tracker.result, task_id)
         else:
-            return jsonify({'error': 'Desteklenmeyen format. csv veya json kullanın'}), 400
+            return jsonify({'error': 'Unsupported format use csv'}), 400
     except Exception as e:
         return jsonify({'error': f'Export errorsı: {str(e)}'}), 500
 
