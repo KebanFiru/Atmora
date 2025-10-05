@@ -158,9 +158,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
             {/* Location Info */}
             {selectedLocation && (
               <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
-                <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                  <span className="text-blue-600">📍</span> Selected Location
-                </h3>
+                <h3 className="font-semibold text-gray-800 mb-2">Selected Location</h3>
                 <p className="text-gray-700">
                   <span className="font-medium">Coordinates:</span> {selectedLocation.latitude.toFixed(4)}°N, {selectedLocation.longitude.toFixed(4)}°E
                 </p>
@@ -173,7 +171,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
             {/* Analysis Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">📅 Select Time Period for Analysis</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Select Time Period for Analysis</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -186,7 +184,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                       onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                    <p className="text-xs text-gray-500 mt-1">💡 Recommend: At least 1 year for better statistics</p>
+                    <p className="text-xs text-gray-500 mt-1">Recommend: At least 1 year for better statistics</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -199,12 +197,12 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                       onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                    <p className="text-xs text-gray-500 mt-1">⚡ Latest available: December 31, 2024</p>
+                    <p className="text-xs text-gray-500 mt-1">Latest available: December 31, 2024</p>
                   </div>
                 </div>
                 <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
                   <p className="text-xs text-blue-800">
-                    <strong>ℹ️ About the data:</strong> NASA POWER provides historical weather observations from satellites and ground stations. 
+                    <strong>About the data:</strong> NASA POWER provides historical weather observations from satellites and ground stations. 
                     Longer time periods give more accurate probability estimates for extreme conditions.
                   </p>
                 </div>
@@ -263,7 +261,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                 </h3>
                 <div className="mb-4">
                   <div className="flex justify-between text-sm text-gray-700 mb-2">
-                    <span className="font-medium">📊 {progress.status}</span>
+                    <span className="font-medium">{progress.status}</span>
                     <span className="font-bold text-blue-700">{progress.percentage.toFixed(1)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
@@ -275,7 +273,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">
-                    ⏱️ Elapsed: {Math.floor(progress.elapsed_time / 60)}m {progress.elapsed_time % 60}s
+                    Elapsed: {Math.floor(progress.elapsed_time / 60)}m {progress.elapsed_time % 60}s
                   </span>
                   <span className="text-xs text-gray-500 italic">
                     Fetching satellite observations & computing statistics...
@@ -289,7 +287,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
               <div className="mt-8 p-6 bg-red-50 rounded-lg border-2 border-red-300 shadow-lg">
                 <h3 className="text-lg font-semibold text-red-800 mb-2">
                   <AlertCircle size={20} className="inline mr-2" />
-                  ❌ Analysis Error
+                  Analysis Error
                 </h3>
                 <p className="text-red-700">{error}</p>
                 <p className="text-xs text-red-600 mt-2 italic">Please try again or select a different location/date range.</p>
@@ -303,35 +301,30 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                 <div className="p-5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-300 shadow-lg">
                   <h3 className="text-xl font-bold text-green-800 mb-3 flex items-center gap-2">
                     <CheckCircle2 size={24} className="text-green-600" />
-                    ✅ Analysis Complete!
+                    Analysis Complete!
                   </h3>
                   <div className="bg-white/60 rounded p-3 border-l-4 border-green-500">
-                    <p className="text-sm font-medium text-gray-800">📋 <strong>Recommendation:</strong></p>
+                    <p className="text-sm font-medium text-gray-800"><strong>Recommendation:</strong></p>
                     <p className="text-sm text-gray-700 mt-1">{analysisResults.recommendation}</p>
                   </div>
                 </div>
 
                 {/* Weather Highlights */}
                 <div className="p-6 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg border border-orange-200 shadow-md">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                    <span className="text-2xl">🌤️</span> Average Weather Conditions
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Average Weather Conditions</h3>
                   <p className="text-xs text-gray-600 mb-4 italic">Mean values calculated from NASA satellite observations over the selected period</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white/70 p-4 rounded-lg text-center shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-3xl mb-2">🌡️</div>
                       <div className="text-2xl font-bold text-orange-600">{analysisResults.weather_highlights.average_temperature}</div>
                       <div className="text-sm font-medium text-gray-700 mt-1">Avg Temperature</div>
                       <div className="text-xs text-gray-500 mt-1">2 meters above ground</div>
                     </div>
                     <div className="bg-white/70 p-4 rounded-lg text-center shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-3xl mb-2">💧</div>
                       <div className="text-2xl font-bold text-blue-600">{analysisResults.weather_highlights.average_humidity}</div>
                       <div className="text-sm font-medium text-gray-700 mt-1">Avg Humidity</div>
                       <div className="text-xs text-gray-500 mt-1">Relative humidity %</div>
                     </div>
                     <div className="bg-white/70 p-4 rounded-lg text-center shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-3xl mb-2">💨</div>
                       <div className="text-2xl font-bold text-green-600">{analysisResults.weather_highlights.average_wind_speed}</div>
                       <div className="text-sm font-medium text-gray-700 mt-1">Avg Wind Speed</div>
                       <div className="text-xs text-gray-500 mt-1">10 meters above ground</div>
@@ -341,9 +334,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
 
                 {/* Risk Assessment */}
                 <div className="p-6 bg-gradient-to-br from-red-50 via-purple-50 to-blue-50 rounded-lg border border-red-200 shadow-md">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                    <span className="text-2xl">⚠️</span> Extreme Weather Risk Assessment
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Extreme Weather Risk Assessment</h3>
                   <p className="text-xs text-gray-600 mb-4 italic">
                     Number of days with extreme conditions based on statistical thresholds (95th percentile for hot/windy/wet, 5th for cold)
                   </p>
@@ -381,7 +372,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                   </div>
                   <div className="mt-4 p-3 bg-amber-50 rounded border border-amber-300">
                     <p className="text-xs text-amber-900">
-                      <strong>💡 What this means:</strong> These counts show historically rare weather events. Higher numbers suggest 
+                      <strong>What this means:</strong> These counts show historically rare weather events. Higher numbers suggest 
                       more frequent extreme conditions during your selected period. Use this to assess outdoor activity risks.
                     </p>
                   </div>
@@ -389,20 +380,18 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
 
                 {/* Overview */}
                 <div className="p-6 bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg border border-gray-300 shadow-md">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="text-xl">📊</span> Analysis Summary
-                  </h3>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Analysis Summary</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white/60 p-3 rounded border-l-4 border-blue-500">
-                      <div className="text-xs text-gray-500 font-semibold uppercase">📍 Location</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">Location</div>
                       <div className="text-sm font-bold text-gray-800 mt-1">{analysisResults.overview.location}</div>
                     </div>
                     <div className="bg-white/60 p-3 rounded border-l-4 border-green-500">
-                      <div className="text-xs text-gray-500 font-semibold uppercase">📅 Time Period</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">Time Period</div>
                       <div className="text-sm font-bold text-gray-800 mt-1">{analysisResults.overview.date_range}</div>
                     </div>
                     <div className="bg-white/60 p-3 rounded border-l-4 border-purple-500">
-                      <div className="text-xs text-gray-500 font-semibold uppercase">🔢 Sample Size</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">Sample Size</div>
                       <div className="text-sm font-bold text-gray-800 mt-1">{analysisResults.overview.total_days} days analyzed</div>
                     </div>
                   </div>
@@ -417,9 +406,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
             {charts && (
               <div className="mt-8 space-y-6">
                 <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-lg border border-blue-200 shadow-lg">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                    <span className="text-2xl">📈</span> Time Series Analysis
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Time Series Analysis</h3>
                   <p className="text-xs text-gray-600 mb-4 italic">
                     Visual representation of weather variables over time showing trends, patterns, and seasonal variations
                   </p>
@@ -431,13 +418,11 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2 text-center">
-                    💡 Look for patterns: Do extreme events cluster in certain seasons? Are conditions changing over time?
+                    Look for patterns: Do extreme events cluster in certain seasons? Are conditions changing over time?
                   </p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200 shadow-lg">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                    <span className="text-2xl">📊</span> Statistical Distribution Analysis
-                  </h3>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Statistical Distribution Analysis</h3>
                   <p className="text-xs text-gray-600 mb-4 italic">
                     Probability distributions and risk metrics showing how often extreme conditions occur
                   </p>
@@ -449,7 +434,7 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2 text-center">
-                    💡 Use these statistics to estimate the likelihood of adverse conditions for planning outdoor activities
+                    Use these statistics to estimate the likelihood of adverse conditions for planning outdoor activities
                   </p>
                 </div>
               </div>
