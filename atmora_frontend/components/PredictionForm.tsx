@@ -71,10 +71,8 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
   selectedLocation
 }) => {
   const [targetDate, setTargetDate] = useState(() => {
-    // Default to 30 days from now
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString().split('T')[0];
+    // Default to March 1, 2025 (Spring season - good for demonstration)
+    return "2025-03-01";
   });
   const [horizon, setHorizon] = useState(1);
   const [isPredicting, setIsPredicting] = useState(false);
@@ -105,7 +103,7 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
           longitude: selectedLocation.longitude,
           targetDate: targetDate,
           horizon: horizon,
-          climate_type: "mediterranean"  // Akdeniz iklimi
+          use_dynamic_data: true  // 🚀 Gerçek zamanlı NASA API'den veri çek
         })
       });
 
@@ -161,18 +159,14 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
     }, 2000);
   };
 
-  // Get minimum date (tomorrow)
+  // Get minimum date (2025-01-01, right after our training data ends)
   const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    return "2025-01-01";  // Training data ends at 2024-12-31
   };
 
-  // Get max date (1 year from now)
+  // Get max date (1 year from model end date: 2025-12-31)
   const getMaxDate = () => {
-    const date = new Date();
-    date.setFullYear(date.getFullYear() + 1);
-    return date.toISOString().split('T')[0];
+    return "2025-12-31";  // Keep predictions within 1 year for reasonable accuracy
   };
 
   // Cleanup on unmount
@@ -233,14 +227,24 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                 </p>
                 <div className="mt-3 pt-3 border-t border-purple-200">
                   <p className="text-sm font-medium text-purple-700">
-                    🌊 Climate Type: <span className="font-bold">Mediterranean (Akdeniz İklimi)</span>
+                    🚀 Data Source: <span className="font-bold">Real-time NASA POWER API</span>
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Predictions based on 4-year historical data from Mediterranean region
+                    📡 Fetching 10 years of historical data for your exact location • Dynamic & Accurate
                   </p>
                 </div>
               </div>
             )}
+
+            {/* Info Banner */}
+            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">ℹ️ Model Training Period:</span> 2015-2024 (10 years)
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Predictions available from <span className="font-bold">January 1, 2025</span> onwards
+              </p>
+            </div>
 
             {/* Prediction Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -258,7 +262,9 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                     onChange={(e) => setTargetDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Must be in the future (max 1 year)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    📅 Range: 2025-01-01 to 2025-12-31 (training ends at 2024-12-31)
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -272,7 +278,9 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                     onChange={(e) => setHorizon(parseInt(e.target.value) || 1)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Number of days to predict (1-90)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of consecutive days to predict (1-90)
+                  </p>
                 </div>
               </div>
 
@@ -454,13 +462,16 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                 {/* Prediction Metadata */}
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg text-xs text-gray-600 border border-purple-200">
                   <p className="mb-1">
-                    <span className="font-medium">🌊 Climate Type:</span> Mediterranean (Akdeniz İklimi)
+                    <span className="font-medium">🚀 Data Source:</span> NASA POWER API (Real-time)
                   </p>
                   <p className="mb-1">
-                    <span className="font-medium">📊 Model:</span> HistGradientBoostingRegressor with 4-year historical training
+                    <span className="font-medium">📊 Model:</span> HistGradientBoostingRegressor with 10-year training
                   </p>
                   <p className="mb-1">
-                    <span className="font-medium">📅 Training Period:</span> Jan 2020 - Dec 2024 (İtalya/İngiltere verisi)
+                    <span className="font-medium">📅 Training Period:</span> 2015-2024 (Location-specific satellite data)
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">📍 Precision:</span> Exact coordinates ({predictionResults.location.latitude.toFixed(4)}°, {predictionResults.location.longitude.toFixed(4)}°)
                   </p>
                   <p>
                     <span className="font-medium">⚠️ Accuracy Note:</span> Accuracy decreases by ~1% every 3 days from Dec 31, 2024

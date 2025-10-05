@@ -142,9 +142,98 @@ def forecast_next_days(
     return predictions
 
 
+def fetch_historical_data_dynamic(lat: float, lon: float, years: int = 10) -> pd.DataFrame:
+    """
+    Fetch real-time historical weather data from NASA POWER API for exact coordinates.
+    This provides location-specific data instead of pre-cached regional data.
+    
+    Args:
+        lat: Exact latitude of the selected location
+        lon: Exact longitude of the selected location
+        years: Number of years of historical data (default 10, max 10-15)
+    
+    Returns:
+        DataFrame with columns: date, latitude, longitude, temperature, wind_speed, precipitation, humidity
+    """
+    API_URL = "https://power.larc.nasa.gov/api/temporal/daily/point"
+    
+    # Calculate date range
+    end_date = datetime(2024, 12, 31)  # NASA data available until end of 2024
+    start_date = end_date - timedelta(days=years*365)
+    
+    start_str = start_date.strftime("%Y%m%d")
+    end_str = end_date.strftime("%Y%m%d")
+    
+    params = {
+        "parameters": "T2M,WS10M,PRECTOTCORR,RH2M",
+        "community": "RE",
+        "longitude": lon,
+        "latitude": lat,
+        "start": start_str,
+        "end": end_str,
+        "format": "JSON",
+    }
+    
+    logger.info(f"🌐 Fetching NASA POWER data for coordinates ({lat:.4f}, {lon:.4f})")
+    logger.info(f"   Date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({years} years)")
+    
+    start_time = time.time()
+    
+    try:
+        response = requests.get(API_URL, params=params, timeout=60)
+        response.raise_for_status()
+        
+        elapsed = time.time() - start_time
+        logger.info(f"   ✅ NASA API responded in {elapsed:.1f}s")
+        
+        data = response.json()
+        parameter_data = data.get("properties", {}).get("parameter", {})
+        
+        # Get all dates
+        dates = sorted(set(parameter_data.get("T2M", {}).keys()))
+        
+        records = []
+        for date_str in dates:
+            date_obj = datetime.strptime(date_str, "%Y%m%d")
+            
+            record = {
+                "date": date_obj.strftime("%Y-%m-%d"),
+                "latitude": lat,
+                "longitude": lon,
+                "temperature": parameter_data.get("T2M", {}).get(date_str, None),
+                "wind_speed": parameter_data.get("WS10M", {}).get(date_str, None),
+                "precipitation": parameter_data.get("PRECTOTCORR", {}).get(date_str, None),
+                "humidity": parameter_data.get("RH2M", {}).get(date_str, None),
+            }
+            records.append(record)
+        
+        df = pd.DataFrame(records)
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Remove rows with missing values
+        initial_count = len(df)
+        df = df.dropna()
+        removed = initial_count - len(df)
+        
+        if removed > 0:
+            logger.warning(f"   Removed {removed} rows with missing data")
+        
+        logger.info(f"✅ Loaded {len(df)} days of location-specific data")
+        logger.info(f"   Temperature avg: {df['temperature'].mean():.1f}°C (range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C)")
+        
+        return df
+        
+    except requests.exceptions.Timeout:
+        logger.error("❌ NASA API timeout (>60s)")
+        raise Exception("NASA POWER API timeout - please try again")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ NASA API error: {e}")
+        raise Exception(f"Failed to fetch NASA data: {str(e)}")
+
+
 def fetch_historical_data(lat: float, lon: float, climate_type: str = "mediterranean") -> pd.DataFrame:
     """
-    Load pre-collected 4-year historical weather data for specific climate types.
+    Load pre-collected historical weather data for specific climate types (fallback method).
     Uses local CSV files instead of API calls for faster predictions.
     
     Args:
@@ -159,10 +248,11 @@ def fetch_historical_data(lat: float, lon: float, climate_type: str = "mediterra
     
     # Map climate types to data files
     climate_data_files = {
-        "mediterranean": "italy_nasa_data.csv",  # Akdeniz iklimi - İtalya/İngiltere verisi
+        "mediterranean": "izmir_nasa_data.csv",  # Akdeniz iklimi - İzmir gerçek verisi (2021-2024, avg 18°C)
         # Gelecekte eklenecek:
         # "tropical": "tropical_nasa_data.csv",
         # "continental": "continental_nasa_data.csv",
+        # "temperate": "italy_nasa_data.csv",  # Ilıman iklim (UK/Italy)
     }
     
     # Default to mediterranean if type not found
@@ -203,16 +293,17 @@ def fetch_historical_data(lat: float, lon: float, climate_type: str = "mediterra
     return df[['date', 'latitude', 'longitude', 'temperature', 'wind_speed', 'precipitation', 'humidity']]
 
 
-def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int = 1, climate_type: str = "mediterranean") -> PredictionResult:
+def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int = 1, climate_type: str = "mediterranean", use_dynamic_data: bool = True) -> PredictionResult:
     """
     Main prediction function for weather forecasting based on climate type
     
     Args:
-        lat: Latitude (for reference)
-        lon: Longitude (for reference)
+        lat: Exact latitude of selected location
+        lon: Exact longitude of selected location
         target_date_str: Target date for prediction (YYYY-MM-DD) - starting point for prediction
         horizon: Number of days to predict from target_date (default 1)
-        climate_type: Climate type - "mediterranean" (Akdeniz iklimi), "tropical", etc.
+        climate_type: Climate type - "mediterranean" (Akdeniz iklimi), etc. (used only if use_dynamic_data=False)
+        use_dynamic_data: If True, fetch real-time data from NASA API for exact coordinates (default True)
     
     Returns:
         PredictionResult with predictions and accuracy metrics
@@ -223,11 +314,17 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
     accuracy_score, confidence_level = calculate_accuracy_score(target_date)
     days_from_2024 = (target_date - datetime(2024, 12, 31)).days
     
-    logger.info(f"🔮 Predicting weather for {lat}, {lon} on {target_date_str}")
-    logger.info(f"   Climate Type: {climate_type.upper()} (accuracy: {accuracy_score}%)")
+    logger.info(f"🔮 Predicting weather for ({lat:.4f}, {lon:.4f}) on {target_date_str}")
+    logger.info(f"   Data Mode: {'DYNAMIC (Real-time NASA API)' if use_dynamic_data else f'STATIC ({climate_type})'}")
+    logger.info(f"   Accuracy: {accuracy_score}%")
     
-    # Load pre-collected historical data based on climate type
-    df = fetch_historical_data(lat, lon, climate_type=climate_type)
+    # Fetch historical data - either dynamic or static
+    if use_dynamic_data:
+        logger.info("📡 Fetching location-specific data from NASA POWER API...")
+        df = fetch_historical_data_dynamic(lat, lon, years=10)
+    else:
+        logger.info(f"📁 Loading pre-collected {climate_type} climate data...")
+        df = fetch_historical_data(lat, lon, climate_type=climate_type)
     
     # Get last available date in historical data
     last_historical_date = df['date'].max()

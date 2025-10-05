@@ -29,18 +29,19 @@ class PredictionTracker:
 @prediction_bp.route('/forecast', methods=['POST'])
 def forecast_weather():
     """
-    Start weather prediction for a future date using climate-specific historical data
+    Start weather prediction for a future date using real-time NASA data
     Expected JSON payload:
     {
-        "latitude": float,
-        "longitude": float,
-        "targetDate": "YYYY-MM-DD",
-        "horizon": int (optional, default 1),
-        "climate_type": string (optional, default "mediterranean" - Akdeniz iklimi)
+        "latitude": float,  # Exact latitude of selected location
+        "longitude": float,  # Exact longitude of selected location
+        "targetDate": "YYYY-MM-DD",  # Future date to predict
+        "horizon": int (optional, default 1),  # Number of days to predict
+        "use_dynamic_data": bool (optional, default True)  # Use real-time NASA API
     }
     
-    Supported climate types:
-    - "mediterranean": Akdeniz iklimi (Italy/UK data - 4 years)
+    Data modes:
+    - use_dynamic_data=True: Fetches 10 years of location-specific data from NASA POWER API (~3-10s)
+    - use_dynamic_data=False: Uses pre-collected regional climate data (faster, less accurate)
     """
     try:
         data = request.json
@@ -67,9 +68,15 @@ def forecast_weather():
         try:
             target_date = datetime.strptime(data['targetDate'], '%Y-%m-%d')
             
-            # Must be in the future
-            if target_date <= datetime.now():
-                return jsonify({'error': 'Hedef tarih gelecekte olmalıdır'}), 400
+            # Must be after training data end date (2024-12-31)
+            training_end_date = datetime(2024, 12, 31)
+            if target_date <= training_end_date:
+                return jsonify({'error': 'Hedef tarih 2025-01-01 veya sonrası olmalıdır (eğitim verisi 2024-12-31\'de bitiyor)'}), 400
+            
+            # Optional: limit to reasonable future (e.g., 1 year)
+            max_prediction_date = datetime(2025, 12, 31)
+            if target_date > max_prediction_date:
+                return jsonify({'error': 'Hedef tarih en fazla 2025-12-31 olabilir (makul doğruluk için)'}), 400
                 
         except ValueError:
             return jsonify({'error': 'Geçersiz tarih formatı. YYYY-MM-DD formatını kullanın'}), 400
@@ -104,7 +111,14 @@ def forecast_weather():
 def process_prediction(data, tracker):
     """Background task for processing prediction"""
     try:
-        tracker.status = "Akdeniz iklimi verisi yükleniyor (4 yıllık)"
+        # Check if dynamic data fetching is enabled (default: True)
+        use_dynamic = data.get('use_dynamic_data', True)
+        
+        if use_dynamic:
+            tracker.status = "NASA POWER API'den 10 yıllık veri çekiliyor..."
+        else:
+            tracker.status = "Akdeniz iklimi verisi yükleniyor (4 yıllık)"
+        
         tracker.progress = 10
         
         result = predict_weather(
@@ -112,7 +126,8 @@ def process_prediction(data, tracker):
             data['longitude'],
             data['targetDate'],
             horizon=data.get('horizon', 1),
-            climate_type=data.get('climate_type', 'mediterranean')  # Default: Akdeniz iklimi
+            climate_type=data.get('climate_type', 'mediterranean'),
+            use_dynamic_data=use_dynamic
         )
         
         tracker.progress = 90
