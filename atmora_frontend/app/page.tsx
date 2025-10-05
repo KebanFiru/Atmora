@@ -9,6 +9,7 @@ import WeatherForm from '@/components/WeatherForm';
 import ClimateForm from '@/components/ClimateForm';
 import TimeScroller from '@/components/TimeScroller';
 import AboutModal from '@/components/AboutModal';
+import WeatherLayersSidebar from '@/components/WeatherLayersSidebar';
 
 // Dynamically import the map component to avoid SSR issues
 const LeafletMapUpdated = dynamic(() => import('@/components/LeafletMapUpdated'), {
@@ -27,6 +28,8 @@ const LeafletMapUpdated = dynamic(() => import('@/components/LeafletMapUpdated')
   isDarkMode: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  rainLayerEnabled?: boolean;
+  rainLayerOpacity?: number;
 }>;
 
 interface WeatherData {
@@ -46,6 +49,9 @@ export default function Home() {
   const [weatherData, setWeatherData] = useState<WeatherData | undefined>(undefined);
   const [zoomLevel, setZoomLevel] = useState(6);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isWeatherLayersOpen, setIsWeatherLayersOpen] = useState(false);
+  const [rainLayerEnabled, setRainLayerEnabled] = useState(false);
+  const [rainLayerOpacity, setRainLayerOpacity] = useState(0.6);
 
   const handleLocationSelect = (longitude: number, latitude: number, geometry?: any) => {
     setSelectedLocation({ longitude, latitude });
@@ -118,6 +124,8 @@ export default function Home() {
         isDarkMode={isDarkMode}
         zoom={zoomLevel}
         onZoomChange={setZoomLevel}
+        rainLayerEnabled={rainLayerEnabled}
+        rainLayerOpacity={rainLayerOpacity}
       />
 
       {/* UI Overlays */}
@@ -149,10 +157,25 @@ export default function Home() {
         onConfirm={handleDateConfirm}
       />
 
+      {/* Weather Layers Button */}
+      <button
+        onClick={() => setIsWeatherLayersOpen(true)}
+        className={`fixed top-1/2 left-4 -translate-y-1/2 backdrop-blur-md hover:scale-105 p-3 rounded-xl shadow-lg transition-all duration-200 group z-[25] ${
+          rainLayerEnabled 
+            ? 'bg-blue-500 text-white animate-pulse' 
+            : 'bg-white/90 hover:bg-white/95 text-gray-700'
+        }`}
+        title="Weather Layers"
+      >
+        <svg className="w-6 h-6 group-hover:rotate-12 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z" />
+        </svg>
+      </button>
+
       {/* About Button */}
       <button
         onClick={() => setIsAboutModalOpen(true)}
-        className="fixed bottom-4 left-4 bg-white/90 backdrop-blur-md hover:bg-white/95 p-3 rounded-full shadow-lg transition-all duration-200 group z-[1000]"
+        className="fixed bottom-4 left-4 bg-white/90 backdrop-blur-md hover:bg-white/95 p-3 rounded-full shadow-lg transition-all duration-200 group z-[25]"
         title="About Atmora"
       >
         <svg className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-colors" fill="currentColor" viewBox="0 0 20 20">
@@ -166,7 +189,6 @@ export default function Home() {
         onClose={() => setIsWeatherFormOpen(false)}
         selectedLocation={selectedLocation}
         onAnalyze={handleWeatherAnalysis}
-        weatherData={weatherData}
       />
 
       <ClimateForm
@@ -178,6 +200,14 @@ export default function Home() {
       <AboutModal
         isOpen={isAboutModalOpen}
         onClose={() => setIsAboutModalOpen(false)}
+      />
+
+      <WeatherLayersSidebar
+        isOpen={isWeatherLayersOpen}
+        onClose={() => setIsWeatherLayersOpen(false)}
+        onRainLayerToggle={setRainLayerEnabled}
+        onOpacityChange={setRainLayerOpacity}
+        rainLayerEnabled={rainLayerEnabled}
       />
     </div>
   );

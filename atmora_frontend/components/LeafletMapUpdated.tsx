@@ -16,6 +16,8 @@ interface LeafletMapUpdatedProps {
   isDarkMode: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  rainLayerEnabled?: boolean;
+  rainLayerOpacity?: number;
 }
 
 // Create the actual map component that will be dynamically loaded
@@ -24,12 +26,16 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
   mode, 
   isDarkMode, 
   zoom, 
-  onZoomChange 
+  onZoomChange,
+  rainLayerEnabled = false,
+  rainLayerOpacity = 0.6
 }) => {
   const [markerPosition, setMarkerPosition] = useState<[number, number]>([39.0, 35.0]); // Turkey center
   const [L, setL] = useState<any>(null);
   const [markerIcon, setMarkerIcon] = useState<any>(null);
   const [reactLeaflet, setReactLeaflet] = useState<any>(null);
+  const [rainViewerLayer, setRainViewerLayer] = useState<any>(null);
+  const [map, setMap] = useState<any>(null);
 
   useEffect(() => {
     // Dynamically import Leaflet and React-Leaflet
@@ -91,6 +97,58 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     handleLocationSelect(center[1], center[0], geometry); // lng, lat
   };
 
+  // RainViewer API integration - MUST be before any conditional returns
+  useEffect(() => {
+    if (!L || !map) return;
+
+    if (rainLayerEnabled) {
+      // Fetch RainViewer radar frames
+      fetch('https://api.rainviewer.com/public/weather-maps.json')
+        .then(response => response.json())
+        .then(data => {
+          if (data.radar && data.radar.past && data.radar.past.length > 0) {
+            const latestFrame = data.radar.past[data.radar.past.length - 1];
+            const tileUrl = `https://tilecache.rainviewer.com${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+            
+            // Remove old layer if exists
+            if (rainViewerLayer) {
+              map.removeLayer(rainViewerLayer);
+            }
+
+            // Add new RainViewer layer
+            const newLayer = L.tileLayer(tileUrl, {
+              opacity: rainLayerOpacity,
+              zIndex: 1000,
+              attribution: 'RainViewer'
+            });
+            
+            newLayer.addTo(map);
+            setRainViewerLayer(newLayer);
+          }
+        })
+        .catch(error => console.error('RainViewer API error:', error));
+    } else {
+      // Remove layer when disabled
+      if (rainViewerLayer) {
+        map.removeLayer(rainViewerLayer);
+        setRainViewerLayer(null);
+      }
+    }
+
+    return () => {
+      if (rainViewerLayer) {
+        map.removeLayer(rainViewerLayer);
+      }
+    };
+  }, [rainLayerEnabled, L, map]);
+
+  // Update opacity when changed
+  useEffect(() => {
+    if (rainViewerLayer) {
+      rainViewerLayer.setOpacity(rainLayerOpacity);
+    }
+  }, [rainLayerOpacity, rainViewerLayer]);
+
   // Don't render until Leaflet is loaded
   if (!L || !markerIcon || !reactLeaflet) {
     return (
@@ -105,27 +163,32 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     );
   }
 
-  const { MapContainer, TileLayer, useMapEvents } = reactLeaflet;
+  const { MapContainer, TileLayer, useMapEvents, useMap } = reactLeaflet;
 
   // Map events component for zoom tracking
   const MapEvents = React.memo(() => {
-    const map = useMapEvents({
+    const mapInstance = useMapEvents({
       zoomend() {
-        const newZoom = map.getZoom();
+        const newZoom = mapInstance.getZoom();
         console.log('Map zoomend event:', newZoom);
         onZoomChange(newZoom);
       }
     });
 
+    // Store map instance
+    React.useEffect(() => {
+      setMap(mapInstance);
+    }, [mapInstance]);
+
     // Update map zoom when zoom prop changes
     React.useEffect(() => {
-      if (map && map.getZoom() !== zoom) {
+      if (mapInstance && mapInstance.getZoom() !== zoom) {
         // Ensure zoom level is within bounds
         const clampedZoom = Math.max(2, Math.min(18, zoom));
-        console.log('Updating map zoom from', map.getZoom(), 'to', clampedZoom);
-        map.setZoom(clampedZoom, { animate: true });
+        console.log('Updating map zoom from', mapInstance.getZoom(), 'to', clampedZoom);
+        mapInstance.setZoom(clampedZoom, { animate: true });
       }
-    }, [zoom, map]);
+    }, [zoom, mapInstance]);
 
     return null;
   });
