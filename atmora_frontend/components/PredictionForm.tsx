@@ -25,6 +25,7 @@ interface PredictionResult {
     latitude: number;
     longitude: number;
   };
+  chart?: string;  // Base64 encoded chart image
   summary: {
     temperature: {
       value: number;
@@ -80,6 +81,8 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [predictionResults, setPredictionResults] = useState<PredictionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [accuracyTestResults, setAccuracyTestResults] = useState<any>(null);
 
   const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -157,6 +160,43 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
         setIsPredicting(false);
       }
     }, 2000);
+  };
+
+  // Handle accuracy test
+  const handleAccuracyTest = async () => {
+    if (!selectedLocation) return;
+
+    setIsTesting(true);
+    setAccuracyTestResults(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/prediction/accuracy-test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          test_months: 3,
+          use_dynamic_data: true
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Accuracy test failed');
+      }
+
+      const data = await response.json();
+      setAccuracyTestResults(data);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Accuracy test failed');
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   // Get minimum date (2025-01-01, right after our training data ends)
@@ -284,24 +324,52 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={!selectedLocation || isPredicting}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all font-medium shadow-lg"
-              >
-                {isPredicting ? (
-                  <>
-                    <Loader2 size={20} className="inline mr-2 animate-spin" />
-                    Predicting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={20} className="inline mr-2" />
-                    Predict Weather
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="submit"
+                  disabled={!selectedLocation || isPredicting}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all font-medium shadow-lg"
+                >
+                  {isPredicting ? (
+                    <>
+                      <Loader2 size={20} className="inline mr-2 animate-spin" />
+                      Predicting...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} className="inline mr-2" />
+                      Predict Weather
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAccuracyTest}
+                  disabled={!selectedLocation || isTesting}
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all font-medium shadow-lg"
+                >
+                  {isTesting ? (
+                    <>
+                      <Loader2 size={20} className="inline mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp size={20} className="inline mr-2" />
+                      Test Accuracy
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
+
+            {/* Accuracy Test Description */}
+            <div className="mt-2 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
+              <p className="text-xs text-cyan-800">
+                <span className="font-semibold">🧪 Accuracy Test:</span> Validates model by predicting 2023 data (3 months) using pre-2023 training
+              </p>
+            </div>
 
             {/* Progress Display */}
             {isPredicting && progress && (
@@ -459,6 +527,23 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                   </div>
                 )}
 
+                {/* Visualization Chart */}
+                {predictionResults.chart && (
+                  <div className="p-6 bg-white rounded-lg shadow-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📈 Historical Data & Predictions Visualization
+                    </h3>
+                    <img 
+                      src={`data:image/png;base64,${predictionResults.chart}`}
+                      alt="Prediction Visualization"
+                      className="w-full h-auto rounded-lg border border-gray-200"
+                    />
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Last 3 years of historical data (solid lines) and predictions (dashed lines)
+                    </p>
+                  </div>
+                )}
+
                 {/* Prediction Metadata */}
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg text-xs text-gray-600 border border-purple-200">
                   <p className="mb-1">
@@ -475,6 +560,79 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
                   </p>
                   <p>
                     <span className="font-medium">⚠️ Accuracy Note:</span> Accuracy decreases by ~1% every 3 days from Dec 31, 2024
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Accuracy Test Results */}
+            {accuracyTestResults && accuracyTestResults.success && (
+              <div className="mt-8 space-y-6">
+                {/* Success Header */}
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">
+                    <CheckCircle2 size={20} className="inline mr-2" />
+                    Accuracy Test Complete!
+                  </h3>
+                  <p className="text-sm text-green-700">
+                    Model tested on {accuracyTestResults.test_period.days} days of 2023 data using pre-2023 training
+                  </p>
+                </div>
+
+                {/* Accuracy Summary */}
+                <div className="p-6 bg-blue-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    🎯 Model Accuracy Summary
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {accuracyTestResults.summary.average_temperature_error}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Avg Temperature Error</div>
+                      <div className="text-xs text-gray-500 mt-1">Mean Absolute Error</div>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-green-600 mb-1">
+                        {accuracyTestResults.summary.overall_accuracy}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Overall Accuracy</div>
+                      <div className="text-xs text-gray-500 mt-1">All parameters</div>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-purple-600 mb-1">
+                        {accuracyTestResults.summary.status}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Model Performance</div>
+                      <div className="text-xs text-gray-500 mt-1">Quality Rating</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accuracy Test Chart */}
+                {accuracyTestResults.chart && (
+                  <div className="p-6 bg-white rounded-lg shadow-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📊 Actual vs Predicted (2023 Test Data)
+                    </h3>
+                    <img 
+                      src={`data:image/png;base64,${accuracyTestResults.chart}`}
+                      alt="Accuracy Test Visualization"
+                      className="w-full h-auto rounded-lg border border-gray-200"
+                    />
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Solid lines: Actual 2023 data • Dashed lines: Model predictions
+                    </p>
+                  </div>
+                )}
+
+                {/* Test Details */}
+                <div className="p-4 bg-gray-100 rounded-lg text-xs text-gray-600">
+                  <p className="mb-1">
+                    <span className="font-medium">Training Period:</span> {accuracyTestResults.training_period.start} to {accuracyTestResults.training_period.end} ({accuracyTestResults.training_period.days} days)
+                  </p>
+                  <p>
+                    <span className="font-medium">Test Period:</span> {accuracyTestResults.test_period.start} to {accuracyTestResults.test_period.end} ({accuracyTestResults.test_period.days} days)
                   </p>
                 </div>
               </div>

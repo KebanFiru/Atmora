@@ -29,6 +29,7 @@ class PredictionResult:
     days_from_2024: int
     target_date: str
     location: Dict[str, float]
+    chart: str = None  # Base64 encoded chart image
 
 
 def calculate_accuracy_score(target_date: datetime) -> tuple[float, str]:
@@ -354,11 +355,22 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
     
     logger.info(f"✅ Generated {len(predictions)} predictions starting from {target_date_str}")
     
+    # Generate visualization chart
+    chart_base64 = None
+    try:
+        from .visualization_service import create_prediction_chart
+        logger.info("📊 Generating prediction visualization chart...")
+        chart_base64 = create_prediction_chart(df, predictions, target_date_str, years_to_show=3)
+        logger.info("✅ Chart generated successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to generate chart: {e}")
+    
     return PredictionResult(
         predictions=predictions,
         accuracy_score=accuracy_score,
         confidence_level=confidence_level,
         days_from_2024=days_from_2024,
         target_date=target_date_str,
-        location={"latitude": lat, "longitude": lon}
+        location={"latitude": lat, "longitude": lon},
+        chart=chart_base64
     )

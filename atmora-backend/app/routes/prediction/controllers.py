@@ -143,7 +143,8 @@ def process_prediction(data, tracker):
             'days_from_2024': result.days_from_2024,
             'target_date': result.target_date,
             'location': result.location,
-            'summary': prediction_summary
+            'summary': prediction_summary,
+            'chart': result.chart  # Base64 encoded chart
         }
         tracker.progress = 100
         tracker.status = "tamamlandı"
@@ -272,6 +273,48 @@ def cleanup_prediction(task_id):
         return jsonify({'status': 'temizlendi', 'task_id': task_id})
     else:
         return jsonify({'error': 'Task bulunamadı'}), 404
+
+
+@prediction_bp.route('/accuracy-test', methods=['POST'])
+def accuracy_test():
+    """
+    Test prediction accuracy for a location using historical data
+    Expected JSON payload:
+    {
+        "latitude": float,
+        "longitude": float,
+        "test_months": int (optional, default 3),
+        "use_dynamic_data": bool (optional, default True)
+    }
+    """
+    try:
+        data = request.json
+        
+        # Validate required fields
+        if 'latitude' not in data or 'longitude' not in data:
+            return jsonify({'error': 'Latitude ve longitude gerekli'}), 400
+        
+        lat = float(data['latitude'])
+        lon = float(data['longitude'])
+        test_months = data.get('test_months', 3)
+        use_dynamic = data.get('use_dynamic_data', True)
+        
+        print(f"🧪 Starting accuracy test for ({lat}, {lon})")
+        
+        # Run accuracy test
+        from app.services.accuracy_test_service import test_prediction_accuracy
+        result = test_prediction_accuracy(lat, lon, test_months, use_dynamic)
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify({'error': result.get('error', 'Test failed')}), 500
+            
+    except Exception as e:
+        print(f"❌ Accuracy test error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @prediction_bp.route('/health', methods=['GET'])
