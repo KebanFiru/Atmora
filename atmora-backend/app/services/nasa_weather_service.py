@@ -322,7 +322,7 @@ def calculate_weather_risks(all_data):
     risks['very_hot'] = {
         'probability': (hot_count / total_points) * 100,
         'threshold': thresholds['very_hot'],
-        'description': f"Sıcaklık {thresholds['very_hot']}°C üzerinde",
+        'description': f"Temperature above {thresholds['very_hot']}°C",
         'risk_level': 'high' if hot_count/total_points > 0.3 else 'medium' if hot_count/total_points > 0.1 else 'low'
     }
     
@@ -330,7 +330,7 @@ def calculate_weather_risks(all_data):
     risks['very_cold'] = {
         'probability': (cold_count / total_points) * 100,
         'threshold': thresholds['very_cold'],
-        'description': f"Sıcaklık {thresholds['very_cold']}°C altında",
+        'description': f"Temperature below {thresholds['very_cold']}°C",
         'risk_level': 'high' if cold_count/total_points > 0.3 else 'medium' if cold_count/total_points > 0.1 else 'low'
     }
     
@@ -338,7 +338,7 @@ def calculate_weather_risks(all_data):
     risks['very_windy'] = {
         'probability': (windy_count / total_points) * 100,
         'threshold': thresholds['very_windy'],
-        'description': f"Rüzgar hızı {thresholds['very_windy']} m/s üzerinde",
+        'description': f"Wind speed above {thresholds['very_windy']} m/s",
         'risk_level': 'high' if windy_count/total_points > 0.3 else 'medium' if windy_count/total_points > 0.1 else 'low'
     }
     
@@ -346,7 +346,7 @@ def calculate_weather_risks(all_data):
     risks['very_wet'] = {
         'probability': (wet_count / total_points) * 100,
         'threshold': thresholds['very_wet'],
-        'description': f"Yağış {thresholds['very_wet']} mm üzerinde",
+        'description': f"Precipitation above {thresholds['very_wet']} mm",
         'risk_level': 'high' if wet_count/total_points > 0.3 else 'medium' if wet_count/total_points > 0.1 else 'low'
     }
     
@@ -354,7 +354,7 @@ def calculate_weather_risks(all_data):
     risks['very_uncomfortable'] = {
         'probability': (humid_count / total_points) * 100,
         'threshold': thresholds['very_humid'],
-        'description': f"Nem oranı %{thresholds['very_humid']} üzerinde",
+        'description': f"Humidity above {thresholds['very_humid']}%",
         'risk_level': 'high' if humid_count/total_points > 0.3 else 'medium' if humid_count/total_points > 0.1 else 'low'
     }
     
@@ -371,17 +371,17 @@ def get_risk_recommendation(risks):
     high_risks = [name for name, data in risks.items() if data.get('risk_level') == 'high']
     
     if not high_risks:
-        return "✅ Hava koşulları outdoor aktiviteler için uygun görünüyor."
+        return "Weather conditions appear suitable for outdoor activities."
     
     recommendations = {
-        'very_hot': "🌡️ Aşırı sıcak olabilir. Bol su için ve gölgelik alanları tercih edin.",
-        'very_cold': "🥶 Çok cold olabilir. Sıcak giyinin ve cold hava ekipmanları getirin.",
-        'very_windy': "💨 Çok windy olabilir. Açık alanda aktivite planlarınızı gözden geçirin.",
-        'very_wet': "🌧️ Yağışlı olabilir. Su geçirmez ekipman ve kapalı alan alternatifleri hazırlayın.",
-        'very_uncomfortable': "💧 Nem oranı yüksek olabilir. Ferahlatıcı içecekler ve cool ortam tercih edin."
+        'very_hot': "Extreme heat possible. Stay hydrated and seek shaded areas.",
+        'very_cold': "Very cold conditions possible. Dress warmly and bring cold weather equipment.",
+        'very_windy': "High winds possible. Review outdoor activity plans carefully.",
+        'very_wet': "Heavy precipitation possible. Bring waterproof equipment and prepare indoor alternatives.",
+        'very_uncomfortable': "High humidity possible. Stay hydrated and seek cool environments."
     }
     
-    advice = "⚠️ Risk faktörleri: " + ", ".join([recommendations.get(risk, risk) for risk in high_risks])
+    advice = "Risk factors: " + ", ".join([recommendations.get(risk, risk) for risk in high_risks])
     return advice
 
 def get_point_data_for_period(latitude, longitude, start_date_str, end_date_str, progress_callback=None):
@@ -465,30 +465,30 @@ def create_weather_charts(data, output_dir="static/charts"):
         humidity_avg.append(np.mean([p['humidity'] for p in points]))
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle('🌍 NASA POWER Hava Durumu Analizi', fontsize=16, fontweight='bold')
+    fig.suptitle('NASA POWER Weather Analysis', fontsize=16, fontweight='bold')
     
     ax1.plot(dates, temp_avg, 'r-', linewidth=2, marker='o', markersize=4)
-    ax1.set_title('🌡️ Sıcaklık (°C)')
-    ax1.set_ylabel('Sıcaklık (°C)')
+    ax1.set_title('Temperature (°C)')
+    ax1.set_ylabel('Temperature (°C)')
     ax1.grid(True, alpha=0.3)
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
     ax2.plot(dates, wind_avg, 'b-', linewidth=2, marker='s', markersize=4)
-    ax2.set_title('💨 Rüzgar Hızı (m/s)')
-    ax2.set_ylabel('Rüzgar Hızı (m/s)')
+    ax2.set_title('Wind Speed (m/s)')
+    ax2.set_ylabel('Wind Speed (m/s)')
     ax2.grid(True, alpha=0.3)
     ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
     ax3.bar(dates, precip_avg, color='skyblue', alpha=0.7, width=0.8)
-    ax3.set_title('🌧️ Yağış (mm)')
-    ax3.set_ylabel('Yağış (mm)')
+    ax3.set_title('Precipitation (mm)')
+    ax3.set_ylabel('Precipitation (mm)')
     ax3.grid(True, alpha=0.3)
     ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
     ax4.fill_between(dates, humidity_avg, alpha=0.5, color='green')
     ax4.plot(dates, humidity_avg, 'g-', linewidth=2)
-    ax4.set_title('💧 Nem (%)')
-    ax4.set_ylabel('Nem (%)')
+    ax4.set_title('Humidity (%)')
+    ax4.set_ylabel('Humidity (%)')
     ax4.grid(True, alpha=0.3)
     ax4.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
@@ -511,13 +511,13 @@ def create_weather_charts(data, output_dir="static/charts"):
     x = np.arange(len(categories))
     width = 0.25
     
-    ax.bar(x - width, averages, width, label='Ortalama', alpha=0.8)
+    ax.bar(x - width, averages, width, label='Average', alpha=0.8)
     ax.bar(x, minimums, width, label='Minimum', alpha=0.8)
-    ax.bar(x + width, maximums, width, label='Maksimum', alpha=0.8)
+    ax.bar(x + width, maximums, width, label='Maximum', alpha=0.8)
     
-    ax.set_xlabel('Parametreler')
-    ax.set_ylabel('Değerler')
-    ax.set_title('📈 Hava Durumu İstatistikleri')
+    ax.set_xlabel('Parameters')
+    ax.set_ylabel('Values')
+    ax.set_title('Weather Statistics')
     ax.set_xticks(x)
     ax.set_xticklabels(categories)
     ax.legend()
