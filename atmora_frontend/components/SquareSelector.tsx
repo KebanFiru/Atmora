@@ -96,21 +96,29 @@ const SquareSelector = ({ icon, onShapeComplete }: SquareSelectorProps) => {
           if (newPoints.length >= 3) {
             const convexPoints = convexHull([...newPoints]);
             setPoints(convexPoints);
-            
-            // Notify parent about center when shape is valid (3+ points)
-            const polygonCenter = calculatePolygonCentroid(convexPoints);
-            if (onShapeComplete) {
-              onShapeComplete(polygonCenter, { type: 'polygon', points: convexPoints });
-            }
           } else {
             setPoints(newPoints);
           }
         } else {
-          alert('Maximum 8 points selected. Right-click to reset.');
+          alert('Maximum 8 points selected. Right-click to finalize or reset.');
         }
       },
-      contextmenu() {
-        setPoints([]);
+      contextmenu(e) {
+        e.originalEvent.preventDefault(); // Prevent default context menu
+        
+        // If we have at least 3 points, finalize the polygon
+        if (points.length >= 3) {
+          const polygonCenter = calculatePolygonCentroid(points);
+          if (onShapeComplete) {
+            onShapeComplete(polygonCenter, { type: 'polygon', points: points });
+          }
+          
+          // Optional: Clear points after completion or keep them
+          // setPoints([]); // Uncomment to clear after completion
+        } else if (points.length > 0) {
+          // If less than 3 points, just reset
+          setPoints([]);
+        }
       },
       mousemove(e) {
         setCursorPosition([e.latlng.lat, e.latlng.lng]);
@@ -142,6 +150,11 @@ const SquareSelector = ({ icon, onShapeComplete }: SquareSelectorProps) => {
                 <div className="mt-1 text-xs">
                   {points.length}/8 points • {points.length === 5 ? 'Pentagon ✨' : `${Math.max(0, 5 - points.length)} more for pentagon`}
                 </div>
+                {points.length >= 3 && (
+                  <div className="mt-2 text-xs font-medium text-purple-600 bg-purple-50 p-1 rounded">
+                    Right-click to finalize
+                  </div>
+                )}
               </div>
             </div>
           </Popup>

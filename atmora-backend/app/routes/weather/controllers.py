@@ -255,14 +255,14 @@ def export_json(result, task_id):
             'task_id': task_id,
             'analysis_tool': 'Atmora Weather Dashboard',
             'data_source': 'NASA POWER API',
-            'date_range': result['date_range'],
-            'coordinates': result['coordinates'],
-            'total_points': result['total_points']
+            'date_range': result.get('date_range', 'N/A'),
+            'coordinates': result.get('coordinates', 'N/A'),
+            'total_points': result.get('total_points', 0)
         },
         'summary': result.get('summary', {}),
-        'statistics': result['statistics'],
-        'risk_analysis': result['risk_analysis'],
-        'daily_data': result['all_data']
+        'statistics': result.get('statistics', {}),
+        'risk_analysis': result.get('risk_analysis', {}),
+        'daily_data': result.get('all_data', [])
     }
     
     # Temporary file oluştur
@@ -288,7 +288,7 @@ def export_csv(result, task_id):
     filename = f"atmora_weather_data_{task_id[:8]}_{timestamp}.csv"
     
     # Temporary file oluştur
-    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
+    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8', newline='')
     
     try:
         writer = csv.writer(temp_file)
@@ -305,7 +305,8 @@ def export_csv(result, task_id):
         ])
         
         # Data rows
-        for point in result['all_data']:
+        all_data = result.get('all_data', [])
+        for point in all_data:
             writer.writerow([
                 point['date'],
                 point['lat'],

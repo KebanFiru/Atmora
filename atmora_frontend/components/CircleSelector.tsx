@@ -83,7 +83,23 @@ const CircleSelector = ({ icon, onShapeComplete }: CircleSelectorProps) => {
     <>
       <ClickHandler />
       
-
+      {/* Center marker - only show when drawing is complete */}
+      {center && !isDrawing && (
+        <Marker position={center} icon={icon}>
+          <Popup>
+            <div className="p-2">
+              <div className="flex items-center mb-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                <span className="font-semibold text-gray-800">Circle Center</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                <div>📍 Lat: {center[0].toFixed(6)}°</div>
+                <div>📍 Lng: {center[1].toFixed(6)}°</div>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      )}
 
       {/* Circle */}
       {center && radius > 0 && (
@@ -98,25 +114,36 @@ const CircleSelector = ({ icon, onShapeComplete }: CircleSelectorProps) => {
             opacity: 0.8,
             dashArray: isDrawing ? '5, 5' : undefined
           }}
+          eventHandlers={{
+            click: (e) => {
+              // Prevent popup from opening during drawing
+              if (isDrawing) {
+                L.DomEvent.stopPropagation(e);
+              }
+            }
+          }}
         >
-          <Popup>
-            <div className="p-2">
-              <div className="flex items-center mb-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                <span className="font-semibold text-gray-800">Selected Area</span>
-              </div>
-              <div className="text-sm text-gray-600">
-                <div className="font-semibold text-blue-700 mb-1">🎯 Center Coordinates:</div>
-                <div>📍 Lat: {center[0].toFixed(6)}°</div>
-                <div>📍 Lng: {center[1].toFixed(6)}°</div>
-                <div className="mt-2 p-2 bg-blue-50 rounded border-l-2 border-blue-400">
-                  <div className="text-xs text-blue-800 font-medium">Area Details:</div>
-                  <div>🔵 Radius: {(radius / 1000).toFixed(2)} km</div>
-                  <div>📐 Area: {(Math.PI * Math.pow(radius / 1000, 2)).toFixed(2)} km²</div>
+          {/* Only show popup when drawing is complete */}
+          {!isDrawing && (
+            <Popup>
+              <div className="p-2">
+                <div className="flex items-center mb-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                  <span className="font-semibold text-gray-800">Selected Area</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  <div className="font-semibold text-blue-700 mb-1">🎯 Center Coordinates:</div>
+                  <div>📍 Lat: {center[0].toFixed(6)}°</div>
+                  <div>📍 Lng: {center[1].toFixed(6)}°</div>
+                  <div className="mt-2 p-2 bg-blue-50 rounded border-l-2 border-blue-400">
+                    <div className="text-xs text-blue-800 font-medium">Area Details:</div>
+                    <div>🔵 Radius: {(radius / 1000).toFixed(2)} km</div>
+                    <div>📐 Area: {(Math.PI * Math.pow(radius / 1000, 2)).toFixed(2)} km²</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Popup>
+            </Popup>
+          )}
         </Circle>
       )}
 
