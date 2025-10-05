@@ -8,6 +8,7 @@ type LatLng = [number, number];
 
 interface SquareSelectorProps {
   icon?: L.Icon | L.DivIcon;
+  onShapeComplete?: (center: [number, number], geometry?: any) => void;
 }
 
 // Convex Hull algorithm to ensure convex polygons
@@ -81,7 +82,7 @@ const calculatePolygonArea = (points: LatLng[]): number => {
   return area * degreeToKm * degreeToKm;
 };
 
-const SquareSelector = ({ icon }: SquareSelectorProps) => {
+const SquareSelector = ({ icon, onShapeComplete }: SquareSelectorProps) => {
   const [points, setPoints] = useState<LatLng[]>([]);
   const [cursorPosition, setCursorPosition] = useState<LatLng | null>(null);
 
@@ -99,11 +100,37 @@ const SquareSelector = ({ icon }: SquareSelectorProps) => {
             setPoints(newPoints);
           }
         } else {
-          alert('Maximum 8 points selected. Right-click to reset.');
+          alert('Maximum 8 points selected. Right-click to finalize or reset.');
         }
       },
-      contextmenu() {
-        setPoints([]);
+      contextmenu(e) {
+        e.originalEvent.preventDefault(); // Prevent default context menu
+        
+        // If we have at least 3 points, finalize the polygon
+        if (points.length >= 3) {
+          const polygonCenter = calculatePolygonCentroid(points);
+          
+          // Calculate bounding box from points
+          const lats = points.map(p => p[0]);
+          const lons = points.map(p => p[1]);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLon = Math.min(...lons);
+          const maxLon = Math.max(...lons);
+          
+          if (onShapeComplete) {
+            onShapeComplete(polygonCenter, { 
+              type: 'square', 
+              bounds: [[minLat, minLon], [maxLat, maxLon]]
+            });
+          }
+          
+          // Optional: Clear points after completion or keep them
+          // setPoints([]); // Uncomment to clear after completion
+        } else if (points.length > 0) {
+          // If less than 3 points, just reset
+          setPoints([]);
+        }
       },
       mousemove(e) {
         setCursorPosition([e.latlng.lat, e.latlng.lng]);
@@ -135,6 +162,11 @@ const SquareSelector = ({ icon }: SquareSelectorProps) => {
                 <div className="mt-1 text-xs">
                   {points.length}/8 points • {points.length === 5 ? 'Pentagon ✨' : `${Math.max(0, 5 - points.length)} more for pentagon`}
                 </div>
+                {points.length >= 3 && (
+                  <div className="mt-2 text-xs font-medium text-purple-600 bg-purple-50 p-1 rounded">
+                    Right-click to finalize
+                  </div>
+                )}
               </div>
             </div>
           </Popup>

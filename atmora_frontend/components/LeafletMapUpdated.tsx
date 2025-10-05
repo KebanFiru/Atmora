@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { MapPin } from 'lucide-react';
 
-// Dynamically import components that depend on Leaflet
 const MarkerSelector = dynamic(() => import('./MarkerSelector'), { ssr: false });
 const SquareSelector = dynamic(() => import('./SquareSelector'), { ssr: false });
 const CircleSelector = dynamic(() => import('./CircleSelector'), { ssr: false });
@@ -16,23 +15,27 @@ interface LeafletMapUpdatedProps {
   isDarkMode: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  rainLayerEnabled?: boolean;
+  rainLayerOpacity?: number;
 }
 
-// Create the actual map component that will be dynamically loaded
 const MapComponent: React.FC<LeafletMapUpdatedProps> = ({ 
   onLocationSelect, 
   mode, 
   isDarkMode, 
   zoom, 
-  onZoomChange 
+  onZoomChange,
+  rainLayerEnabled = false,
+  rainLayerOpacity = 0.6
 }) => {
   const [markerPosition, setMarkerPosition] = useState<[number, number]>([39.0, 35.0]); // Turkey center
   const [L, setL] = useState<any>(null);
   const [markerIcon, setMarkerIcon] = useState<any>(null);
   const [reactLeaflet, setReactLeaflet] = useState<any>(null);
+  const [rainViewerLayer, setRainViewerLayer] = useState<any>(null);
+  const [map, setMap] = useState<any>(null);
 
   useEffect(() => {
-    // Dynamically import Leaflet and React-Leaflet
     const loadLeaflet = async () => {
       const [leafletModule, reactLeafletModule, ReactDOMServer] = await Promise.all([
         import('leaflet'),
@@ -40,7 +43,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         import('react-dom/server')
       ]);
 
-      // Import CSS - we'll handle this differently
       if (typeof window !== 'undefined') {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
@@ -50,7 +52,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
 
       const L = leafletModule.default;
       
-      // Fix for default markers in Leaflet
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -58,7 +59,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       });
 
-      // Create custom marker icon
       const iconMarkup = ReactDOMServer.renderToStaticMarkup(
         React.createElement(MapPin, { size: 32, color: "red" })
       );
@@ -78,14 +78,64 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     loadLeaflet();
   }, []);
 
-  const handleLocationSelect = (longitude: number, latitude: number) => {
-    onLocationSelect(longitude, latitude);
+  const handleLocationSelect = (longitude: number, latitude: number, geometry?: any) => {
+    onLocationSelect(longitude, latitude, geometry);
   };
 
   const handleMarkerPositionChange = (pos: [number, number]) => {
     setMarkerPosition(pos);
-    handleLocationSelect(pos[1], pos[0]); // lng, lat
+    handleLocationSelect(pos[1], pos[0]); 
   };
+
+  const handleShapeSelect = (center: [number, number], geometry?: any) => {
+    handleLocationSelect(center[1], center[0], geometry);
+  };
+
+  useEffect(() => {
+    if (!L || !map) return;
+
+    if (rainLayerEnabled) {
+      fetch('https://api.rainviewer.com/public/weather-maps.json')
+        .then(response => response.json())
+        .then(data => {
+          if (data.radar && data.radar.past && data.radar.past.length > 0) {
+            const latestFrame = data.radar.past[data.radar.past.length - 1];
+            const tileUrl = `https://tilecache.rainviewer.com${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+            
+            if (rainViewerLayer) {
+              map.removeLayer(rainViewerLayer);
+            }
+
+            const newLayer = L.tileLayer(tileUrl, {
+              opacity: rainLayerOpacity,
+              zIndex: 1000,
+              attribution: 'RainViewer'
+            });
+            
+            newLayer.addTo(map);
+            setRainViewerLayer(newLayer);
+          }
+        })
+        .catch(error => console.error('RainViewer API error:', error));
+    } else {
+      if (rainViewerLayer) {
+        map.removeLayer(rainViewerLayer);
+        setRainViewerLayer(null);
+      }
+    }
+
+    return () => {
+      if (rainViewerLayer) {
+        map.removeLayer(rainViewerLayer);
+      }
+    };
+  }, [rainLayerEnabled, L, map]);
+
+  useEffect(() => {
+    if (rainViewerLayer) {
+      rainViewerLayer.setOpacity(rainLayerOpacity);
+    }
+  }, [rainLayerOpacity, rainViewerLayer]);
 
   // Don't render until Leaflet is loaded
   if (!L || !markerIcon || !reactLeaflet) {
@@ -101,27 +151,32 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     );
   }
 
-  const { MapContainer, TileLayer, useMapEvents } = reactLeaflet;
+  const { MapContainer, TileLayer, useMapEvents, useMap } = reactLeaflet;
 
   // Map events component for zoom tracking
   const MapEvents = React.memo(() => {
-    const map = useMapEvents({
+    const mapInstance = useMapEvents({
       zoomend() {
-        const newZoom = map.getZoom();
+        const newZoom = mapInstance.getZoom();
         console.log('Map zoomend event:', newZoom);
         onZoomChange(newZoom);
       }
     });
 
+    // Store map instance
+    React.useEffect(() => {
+      setMap(mapInstance);
+    }, [mapInstance]);
+
     // Update map zoom when zoom prop changes
     React.useEffect(() => {
-      if (map && map.getZoom() !== zoom) {
+      if (mapInstance && mapInstance.getZoom() !== zoom) {
         // Ensure zoom level is within bounds
         const clampedZoom = Math.max(2, Math.min(18, zoom));
-        console.log('Updating map zoom from', map.getZoom(), 'to', clampedZoom);
-        map.setZoom(clampedZoom, { animate: true });
+        console.log('Updating map zoom from', mapInstance.getZoom(), 'to', clampedZoom);
+        mapInstance.setZoom(clampedZoom, { animate: true });
       }
-    }, [zoom, map]);
+    }, [zoom, mapInstance]);
 
     return null;
   });
@@ -136,19 +191,19 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         center={markerPosition}
         zoom={zoom}
         className="w-full h-full"
-        zoomControl={false} // We'll use custom controls
-        minZoom={2} // Minimum zoom level to prevent excessive zoom out
-        maxZoom={18} // Maximum zoom level
+        zoomControl={false} 
+        minZoom={2} 
+        maxZoom={18}
         maxBounds={[
-          [-90, -180], // Southwest coordinates (bottom-left)
-          [90, 180]    // Northeast coordinates (top-right)
+          [-90, -180], 
+          [90, 180] 
         ]}
-        maxBoundsViscosity={1.0} // Prevents panning outside bounds completely
+        maxBoundsViscosity={1.0} 
       >
         <TileLayer
           attribution="&copy; Esri"
           url={tileLayerUrl}
-          key={tileLayerUrl} // Force re-render when URL changes
+          key={tileLayerUrl}
         />
 
         <MapEvents />
@@ -165,18 +220,21 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         {mode === 'square' && (
           <SquareSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
 
         {mode === 'circle' && (
           <CircleSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
 
         {mode === 'rectangle' && (
           <RectangleSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
       </MapContainer>
@@ -201,7 +259,7 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
   );
 };
 
-// Main component that uses dynamic import
+
 const LeafletMapUpdated: React.FC<LeafletMapUpdatedProps> = (props) => {
   const [isClient, setIsClient] = useState(false);
 
@@ -209,7 +267,7 @@ const LeafletMapUpdated: React.FC<LeafletMapUpdatedProps> = (props) => {
     setIsClient(true);
   }, []);
 
-  // Don't render map on server side
+ 
   if (!isClient) {
     return (
       <div className={`w-full h-screen flex items-center justify-center ${

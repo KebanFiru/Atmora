@@ -1,14 +1,26 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Calendar, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, Calendar, ChevronUp, ChevronDown, Users } from 'lucide-react';
 
 interface TimeScrollerProps {
   onDateChange: (date: Date) => void;
   onConfirm: (date: Date) => void;
+  selectedGeometry?: {
+    type: 'marker' | 'circle' | 'square' | 'rectangle';
+    center?: { lat: number; lon: number };
+    radius?: number;
+    bounds?: [[number, number], [number, number]];
+  } | null;
+  onPopulationRequest?: (date: Date) => void;
 }
 
-const TimeScroller: React.FC<TimeScrollerProps> = ({ onDateChange, onConfirm }) => {
+const TimeScroller: React.FC<TimeScrollerProps> = ({ 
+  onDateChange, 
+  onConfirm,
+  selectedGeometry,
+  onPopulationRequest 
+}) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isOpen, setIsOpen] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
@@ -44,7 +56,23 @@ const TimeScroller: React.FC<TimeScrollerProps> = ({ onDateChange, onConfirm }) 
     onDateChange(newDate);
   };
 
+  const handlePopulationClick = () => {
+    if (!selectedGeometry) {
+      alert('Please select an area on the map first (using Circle, Square, or Rectangle tool)');
+      return;
+    }
 
+    if (selectedGeometry.type === 'marker') {
+      alert('Population analysis requires an area selection.\nPlease use Circle, Square, or Rectangle tool instead of single marker.');
+      return;
+    }
+
+    if (onPopulationRequest) {
+      onPopulationRequest(selectedDate);
+    }
+  };
+
+  const canRequestPopulation = selectedGeometry && selectedGeometry.type !== 'marker';
 
   return (
     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
@@ -148,16 +176,44 @@ const TimeScroller: React.FC<TimeScrollerProps> = ({ onDateChange, onConfirm }) 
               ))}
             </div>
             
-            {/* Apply Button */}
+            {/* Apply Date Button - Now shows heat map */}
             <button
               onClick={handleConfirm}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white py-2 px-4 rounded-lg transition-colors font-medium flex items-center justify-center gap-2 shadow-md"
             >
               <Check size={16} />
-              Apply Date
+              Apply Date & Show Heat Map
             </button>
           </div>
         )}
+
+        {/* Bring Population Button */}
+        <div className="p-4 border-t border-gray-200/50">
+          <button
+            onClick={handlePopulationClick}
+            disabled={!canRequestPopulation}
+            className={`w-full py-2.5 px-4 rounded-lg transition-all duration-200 font-medium flex items-center justify-center gap-2 ${
+              canRequestPopulation
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-md hover:shadow-lg'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+            title={
+              !selectedGeometry
+                ? 'Select an area first'
+                : selectedGeometry.type === 'marker'
+                ? 'Use area tools (Circle, Square, Rectangle)'
+                : 'Get population data for selected area'
+            }
+          >
+            <Users size={18} />
+            <span className="text-sm">Bring Population</span>
+          </button>
+          {!canRequestPopulation && (
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Select an area using Circle, Square, or Rectangle tool
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

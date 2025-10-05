@@ -1,0 +1,647 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, Loader2, AlertCircle, CheckCircle2, Calendar, TrendingUp } from 'lucide-react';
+
+interface PredictionFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedLocation: { longitude: number; latitude: number } | null;
+}
+
+interface PredictionResult {
+  predictions: Array<{
+    date: string;
+    temperature: number;
+    wind_speed: number;
+    precipitation: number;
+    humidity: number;
+  }>;
+  accuracy_score: number;
+  confidence_level: string;
+  days_from_2024: number;
+  target_date: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  chart?: string;  // Base64 encoded chart image
+  summary: {
+    temperature: {
+      value: number;
+      description: string;
+      unit: string;
+    };
+    wind_speed: {
+      value: number;
+      description: string;
+      unit: string;
+    };
+    precipitation: {
+      value: number;
+      description: string;
+      unit: string;
+    };
+    humidity: {
+      value: number;
+      unit: string;
+    };
+    overall_condition: string;
+    accuracy_bar: {
+      score: number;
+      color: string;
+      confidence: string;
+    };
+    warning: string;
+  };
+}
+
+interface ProgressResponse {
+  task_id: string;
+  progress: number;
+  status: string;
+  elapsed_time: number;
+  completed?: boolean;
+  result?: PredictionResult;
+  error?: string;
+}
+
+const PredictionForm: React.FC<PredictionFormProps> = ({ 
+  isOpen, 
+  onClose, 
+  selectedLocation
+}) => {
+  const [targetDate, setTargetDate] = useState(() => {
+    // Default to March 1, 2025 (Spring season - good for demonstration)
+    return "2025-03-01";
+  });
+  const [horizon, setHorizon] = useState(1);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [predictionResults, setPredictionResults] = useState<PredictionResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [accuracyTestResults, setAccuracyTestResults] = useState<any>(null);
+
+  const API_BASE_URL = 'http://127.0.0.1:5000/api';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLocation) return;
+
+    setIsPredicting(true);
+    setError(null);
+    setPredictionResults(null);
+
+    try {
+      // Start prediction
+      const response = await fetch(`${API_BASE_URL}/prediction/forecast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          targetDate: targetDate,
+          horizon: horizon,
+          use_dynamic_data: true  // 🚀 Gerçek zamanlı NASA API'den veri çek
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Prediction failed');
+      }
+
+      const data = await response.json();
+      setCurrentTaskId(data.task_id);
+      
+      // Start polling for progress
+      pollProgress(data.task_id);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Prediction failed');
+      setIsPredicting(false);
+    }
+  };
+
+  const pollProgress = async (taskId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/prediction/progress/${taskId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to get progress');
+        }
+
+        const progressData: ProgressResponse = await response.json();
+        setProgress(progressData);
+
+        if (progressData.completed) {
+          clearInterval(pollInterval);
+          setIsPredicting(false);
+          
+          if (progressData.result) {
+            setPredictionResults(progressData.result);
+          }
+        }
+
+        if (progressData.error) {
+          clearInterval(pollInterval);
+          setError(progressData.error);
+          setIsPredicting(false);
+        }
+
+      } catch (err) {
+        clearInterval(pollInterval);
+        setError(err instanceof Error ? err.message : 'Failed to get progress');
+        setIsPredicting(false);
+      }
+    }, 2000);
+  };
+
+  // Handle accuracy test
+  const handleAccuracyTest = async () => {
+    if (!selectedLocation) return;
+
+    setIsTesting(true);
+    setAccuracyTestResults(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/prediction/accuracy-test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          test_months: 3,
+          use_dynamic_data: true
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Accuracy test failed');
+      }
+
+      const data = await response.json();
+      setAccuracyTestResults(data);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Accuracy test failed');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  // Get minimum date (2025-01-01, right after our training data ends)
+  const getMinDate = () => {
+    return "2025-01-01";  // Training data ends at 2024-12-31
+  };
+
+  // Get max date (1 year from model end date: 2025-12-31)
+  const getMaxDate = () => {
+    return "2025-12-31";  // Keep predictions within 1 year for reasonable accuracy
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (currentTaskId && !isPredicting) {
+        fetch(`${API_BASE_URL}/prediction/cleanup/${currentTaskId}`, {
+          method: 'DELETE'
+        }).catch(console.error);
+      }
+    };
+  }, [currentTaskId, isPredicting]);
+
+  if (!isOpen) return null;
+
+  // Get accuracy bar color class
+  const getAccuracyColorClass = (score: number) => {
+    if (score >= 80) return 'bg-green-500';
+    if (score >= 50) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  // Get accuracy icon
+  const getAccuracyIcon = (level: string) => {
+    if (level === 'high') return '✅';
+    if (level === 'medium') return '⚠️';
+    return '❌';
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
+      <div className="bg-black/20 backdrop-blur-sm absolute inset-0" onClick={onClose} />
+      
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 w-full max-w-4xl mx-4 relative max-h-[80vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <Sparkles size={28} className="text-purple-600" />
+            <h2 className="text-2xl font-bold text-gray-800">Weather Prediction</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto max-h-[calc(80vh-80px)]">
+          <div className="p-6">
+            {/* Location Info */}
+            {selectedLocation && (
+              <div className="mb-6 p-4 bg-purple-50 rounded-lg border-l-4 border-purple-500">
+                <h3 className="font-semibold text-gray-800 mb-2">📍 Selected Location</h3>
+                <p className="text-gray-600 mb-2">
+                  Latitude: {selectedLocation.latitude.toFixed(4)}°, 
+                  Longitude: {selectedLocation.longitude.toFixed(4)}°
+                </p>
+                <div className="mt-3 pt-3 border-t border-purple-200">
+                  <p className="text-sm font-medium text-purple-700">
+                    🚀 Data Source: <span className="font-bold">Real-time NASA POWER API</span>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    📡 Fetching 10 years of historical data for your exact location • Dynamic & Accurate
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Info Banner */}
+            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">ℹ️ Model Training Period:</span> 2015-2024 (10 years)
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Predictions available from <span className="font-bold">January 1, 2025</span> onwards
+              </p>
+            </div>
+
+            {/* Prediction Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Calendar size={16} className="inline mr-1" />
+                    Target Date
+                  </label>
+                  <input
+                    type="date"
+                    value={targetDate}
+                    min={getMinDate()}
+                    max={getMaxDate()}
+                    onChange={(e) => setTargetDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    📅 Range: 2025-01-01 to 2025-12-31 (training ends at 2024-12-31)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Prediction Horizon (days)
+                  </label>
+                  <input
+                    type="number"
+                    value={horizon}
+                    min="1"
+                    max="90"
+                    onChange={(e) => setHorizon(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of consecutive days to predict (1-90)
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="submit"
+                  disabled={!selectedLocation || isPredicting}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all font-medium shadow-lg"
+                >
+                  {isPredicting ? (
+                    <>
+                      <Loader2 size={20} className="inline mr-2 animate-spin" />
+                      Predicting...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} className="inline mr-2" />
+                      Predict Weather
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAccuracyTest}
+                  disabled={!selectedLocation || isTesting}
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all font-medium shadow-lg"
+                >
+                  {isTesting ? (
+                    <>
+                      <Loader2 size={20} className="inline mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp size={20} className="inline mr-2" />
+                      Test Accuracy
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Accuracy Test Description */}
+            <div className="mt-2 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
+              <p className="text-xs text-cyan-800">
+                <span className="font-semibold">🧪 Accuracy Test:</span> Validates model by predicting 2023 data (3 months) using pre-2023 training
+              </p>
+            </div>
+
+            {/* Progress Display */}
+            {isPredicting && progress && (
+              <div className="mt-8 p-6 bg-purple-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  <Loader2 size={20} className="inline mr-2 animate-spin" />
+                  Prediction in Progress
+                </h3>
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>{progress.status}</span>
+                    <span>{progress.progress.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Elapsed time: {Math.floor(progress.elapsed_time / 60)}m {progress.elapsed_time % 60}s
+                </div>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="mt-8 p-6 bg-red-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-red-800 mb-2">
+                  <AlertCircle size={20} className="inline mr-2" />
+                  Prediction Error
+                </h3>
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+
+            {/* Prediction Results */}
+            {predictionResults && (
+              <div className="mt-8 space-y-6">
+                {/* Success Header */}
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">
+                    <CheckCircle2 size={20} className="inline mr-2" />
+                    Prediction Complete!
+                  </h3>
+                  <p className="text-sm text-gray-700">
+                    Target Date: <span className="font-bold">{predictionResults.target_date}</span> ({predictionResults.days_from_2024} days from training data)
+                  </p>
+                </div>
+
+                {/* Accuracy Bar */}
+                <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    {getAccuracyIcon(predictionResults.summary.accuracy_bar.confidence)} Prediction Accuracy
+                  </h3>
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span className="font-medium">Confidence Level: {predictionResults.summary.accuracy_bar.confidence.toUpperCase()}</span>
+                      <span className="font-bold">{predictionResults.summary.accuracy_bar.score.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div 
+                        className={`${getAccuracyColorClass(predictionResults.summary.accuracy_bar.score)} h-4 rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
+                        style={{ width: `${predictionResults.summary.accuracy_bar.score}%` }}
+                      >
+                        <span className="text-white text-xs font-bold">{predictionResults.summary.accuracy_bar.score.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-700 italic">
+                    {predictionResults.summary.warning}
+                  </p>
+                </div>
+
+                {/* Weather Prediction Summary */}
+                <div className="p-6 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    <TrendingUp size={20} className="inline mr-2" />
+                    Predicted Conditions
+                  </h3>
+                  <p className="text-lg font-medium text-gray-700 mb-6">
+                    {predictionResults.summary.overall_condition}
+                  </p>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Temperature */}
+                    <div className="p-4 bg-white rounded-lg shadow-sm">
+                      <div className="text-3xl font-bold text-orange-600 mb-1">
+                        {predictionResults.summary.temperature.value}{predictionResults.summary.temperature.unit}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Temperature</div>
+                      <div className="text-xs text-gray-500">{predictionResults.summary.temperature.description}</div>
+                    </div>
+
+                    {/* Wind Speed */}
+                    <div className="p-4 bg-white rounded-lg shadow-sm">
+                      <div className="text-3xl font-bold text-blue-600 mb-1">
+                        {predictionResults.summary.wind_speed.value}{predictionResults.summary.wind_speed.unit}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Wind Speed</div>
+                      <div className="text-xs text-gray-500">{predictionResults.summary.wind_speed.description}</div>
+                    </div>
+
+                    {/* Precipitation */}
+                    <div className="p-4 bg-white rounded-lg shadow-sm">
+                      <div className="text-3xl font-bold text-green-600 mb-1">
+                        {predictionResults.summary.precipitation.value}{predictionResults.summary.precipitation.unit}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Precipitation</div>
+                      <div className="text-xs text-gray-500">{predictionResults.summary.precipitation.description}</div>
+                    </div>
+
+                    {/* Humidity */}
+                    <div className="p-4 bg-white rounded-lg shadow-sm">
+                      <div className="text-3xl font-bold text-cyan-600 mb-1">
+                        {predictionResults.summary.humidity.value}{predictionResults.summary.humidity.unit}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">Humidity</div>
+                      <div className="text-xs text-gray-500">relative humidity</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Multi-day Predictions */}
+                {predictionResults.predictions.length > 1 && (
+                  <div className="p-6 bg-gray-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      Extended Forecast ({predictionResults.predictions.length} days)
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b-2 border-gray-300">
+                            <th className="text-left py-2 px-3">Date</th>
+                            <th className="text-center py-2 px-3">Temp (°C)</th>
+                            <th className="text-center py-2 px-3">Wind (m/s)</th>
+                            <th className="text-center py-2 px-3">Precip (mm)</th>
+                            <th className="text-center py-2 px-3">Humidity (%)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {predictionResults.predictions.map((day, idx) => (
+                            <tr key={idx} className="border-b border-gray-200 hover:bg-white">
+                              <td className="py-2 px-3 font-medium">{day.date}</td>
+                              <td className="text-center py-2 px-3">{day.temperature.toFixed(1)}</td>
+                              <td className="text-center py-2 px-3">{day.wind_speed.toFixed(1)}</td>
+                              <td className="text-center py-2 px-3">{day.precipitation.toFixed(1)}</td>
+                              <td className="text-center py-2 px-3">{day.humidity.toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Visualization Chart */}
+                {predictionResults.chart && (
+                  <div className="p-6 bg-white rounded-lg shadow-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📈 Historical Data & Predictions Visualization
+                    </h3>
+                    <img 
+                      src={`data:image/png;base64,${predictionResults.chart}`}
+                      alt="Prediction Visualization"
+                      className="w-full h-auto rounded-lg border border-gray-200"
+                    />
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Last 3 years of historical data (solid lines) and predictions (dashed lines)
+                    </p>
+                  </div>
+                )}
+
+                {/* Prediction Metadata */}
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg text-xs text-gray-600 border border-purple-200">
+                  <p className="mb-1">
+                    <span className="font-medium">🚀 Data Source:</span> NASA POWER API (Real-time)
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">📊 Model:</span> HistGradientBoostingRegressor with 10-year training
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">📅 Training Period:</span> 2015-2024 (Location-specific satellite data)
+                  </p>
+                  <p className="mb-1">
+                    <span className="font-medium">📍 Precision:</span> Exact coordinates ({predictionResults.location.latitude.toFixed(4)}°, {predictionResults.location.longitude.toFixed(4)}°)
+                  </p>
+                  <p>
+                    <span className="font-medium">⚠️ Accuracy Note:</span> Accuracy decreases by ~1% every 3 days from Dec 31, 2024
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Accuracy Test Results */}
+            {accuracyTestResults && accuracyTestResults.success && (
+              <div className="mt-8 space-y-6">
+                {/* Success Header */}
+                <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">
+                    <CheckCircle2 size={20} className="inline mr-2" />
+                    Accuracy Test Complete!
+                  </h3>
+                  <p className="text-sm text-green-700">
+                    Model tested on {accuracyTestResults.test_period.days} days of 2023 data using pre-2023 training
+                  </p>
+                </div>
+
+                {/* Accuracy Summary */}
+                <div className="p-6 bg-blue-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    🎯 Model Accuracy Summary
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {accuracyTestResults.summary.average_temperature_error}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Avg Temperature Error</div>
+                      <div className="text-xs text-gray-500 mt-1">Mean Absolute Error</div>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-green-600 mb-1">
+                        {accuracyTestResults.summary.overall_accuracy}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Overall Accuracy</div>
+                      <div className="text-xs text-gray-500 mt-1">All parameters</div>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg shadow-sm text-center">
+                      <div className="text-2xl font-bold text-purple-600 mb-1">
+                        {accuracyTestResults.summary.status}
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">Model Performance</div>
+                      <div className="text-xs text-gray-500 mt-1">Quality Rating</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accuracy Test Chart */}
+                {accuracyTestResults.chart && (
+                  <div className="p-6 bg-white rounded-lg shadow-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📊 Actual vs Predicted (2023 Test Data)
+                    </h3>
+                    <img 
+                      src={`data:image/png;base64,${accuracyTestResults.chart}`}
+                      alt="Accuracy Test Visualization"
+                      className="w-full h-auto rounded-lg border border-gray-200"
+                    />
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Solid lines: Actual 2023 data • Dashed lines: Model predictions
+                    </p>
+                  </div>
+                )}
+
+                {/* Test Details */}
+                <div className="p-4 bg-gray-100 rounded-lg text-xs text-gray-600">
+                  <p className="mb-1">
+                    <span className="font-medium">Training Period:</span> {accuracyTestResults.training_period.start} to {accuracyTestResults.training_period.end} ({accuracyTestResults.training_period.days} days)
+                  </p>
+                  <p>
+                    <span className="font-medium">Test Period:</span> {accuracyTestResults.test_period.start} to {accuracyTestResults.test_period.end} ({accuracyTestResults.test_period.days} days)
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PredictionForm;
