@@ -30,8 +30,10 @@ def create_app():
     
     from .routes.weather.controllers import weather_bp
     from .routes.prediction.controllers import prediction_bp
+    from .routes.population.controllers import population_bp
     app.register_blueprint(weather_bp, url_prefix='/api/weather')
     app.register_blueprint(prediction_bp, url_prefix='/api/prediction')
+    app.register_blueprint(population_bp, url_prefix='/api/population')
     
     @app.route('/api/health')
     def health():
@@ -52,7 +54,9 @@ def create_app():
                 'weather_progress': '/api/weather/progress/<task_id>',
                 'weather_export': '/api/weather/export/<task_id>/<format>',
                 'weather_forecast': '/api/prediction/forecast',
-                'forecast_progress': '/api/prediction/progress/<task_id>'
+                'forecast_progress': '/api/prediction/progress/<task_id>',
+                'population_analyze': '/api/population/analyze',
+                'population_info': '/api/population/info'
             }
         }
     

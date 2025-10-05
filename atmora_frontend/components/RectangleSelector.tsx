@@ -59,8 +59,13 @@ const RectangleSelector = ({ icon, onShapeComplete }: RectangleSelectorProps) =>
           
           // Calculate and notify parent about center
           const rectCenter = calculateCenter(startPoint, newPos);
+          const rectBounds = createBounds(startPoint, newPos);
+          
           if (onShapeComplete) {
-            onShapeComplete(rectCenter, { type: 'rectangle', bounds: createBounds(startPoint, newPos) });
+            onShapeComplete(rectCenter, { 
+              type: 'rectangle', 
+              bounds: rectBounds
+            });
           }
         } else {
           // Reset and start new rectangle

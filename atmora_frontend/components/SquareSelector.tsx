@@ -109,8 +109,20 @@ const SquareSelector = ({ icon, onShapeComplete }: SquareSelectorProps) => {
         // If we have at least 3 points, finalize the polygon
         if (points.length >= 3) {
           const polygonCenter = calculatePolygonCentroid(points);
+          
+          // Calculate bounding box from points
+          const lats = points.map(p => p[0]);
+          const lons = points.map(p => p[1]);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLon = Math.min(...lons);
+          const maxLon = Math.max(...lons);
+          
           if (onShapeComplete) {
-            onShapeComplete(polygonCenter, { type: 'polygon', points: points });
+            onShapeComplete(polygonCenter, { 
+              type: 'square', 
+              bounds: [[minLat, minLon], [maxLat, maxLon]]
+            });
           }
           
           // Optional: Clear points after completion or keep them

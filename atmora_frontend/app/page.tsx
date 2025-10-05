@@ -8,9 +8,11 @@ import HeaderButtons from '@/components/HeaderButtons';
 import WeatherForm from '@/components/WeatherForm';
 import ClimateForm from '@/components/ClimateForm';
 import PredictionForm from '@/components/PredictionForm';
-import TimeScroller from '@/components/TimeScroller';
 import AboutModal from '@/components/AboutModal';
 import WeatherLayersSidebar from '@/components/WeatherLayersSidebar';
+import TimeScroller from '@/components/TimeScroller';
+import PopulationResultModal from '@/components/PopulationResultModal';
+import { PopulationAPI, PopulationData } from '@/lib/population-api';
 
 // Dynamically import the map component to avoid SSR issues
 const LeafletMapUpdated = dynamic(() => import('@/components/LeafletMapUpdated'), {
@@ -54,10 +56,76 @@ export default function Home() {
   const [isWeatherLayersOpen, setIsWeatherLayersOpen] = useState(false);
   const [rainLayerEnabled, setRainLayerEnabled] = useState(false);
   const [rainLayerOpacity, setRainLayerOpacity] = useState(0.6);
+  const [isPopulationModalOpen, setIsPopulationModalOpen] = useState(false);
+  const [populationData, setPopulationData] = useState<PopulationData | null>(null);
+  const [isLoadingPopulation, setIsLoadingPopulation] = useState(false);
+  const [selectedGeometry, setSelectedGeometry] = useState<any>(null);
 
   const handleLocationSelect = (longitude: number, latitude: number, geometry?: any) => {
     setSelectedLocation({ longitude, latitude });
+    
+    // Store geometry information for population analysis
+    if (geometry) {
+      setSelectedGeometry(geometry);
+    } else if (selectedTool === 'marker') {
+      setSelectedGeometry({ type: 'marker', center: { lat: latitude, lon: longitude } });
+    }
+    
     console.log('Selected location:', { longitude, latitude, geometry });
+  };
+
+  const handlePopulationRequest = async (date: Date) => {
+    if (!selectedGeometry || selectedGeometry.type === 'marker') {
+      console.log('Population request requires area selection');
+      return;
+    }
+
+    setIsLoadingPopulation(true);
+    setIsPopulationModalOpen(true);
+    setPopulationData(null);
+
+    try {
+      const api = new PopulationAPI();
+      
+      // Prepare geometry payload based on type
+      let geometryPayload: any = {
+        type: selectedGeometry.type
+      };
+
+      if (selectedGeometry.type === 'circle') {
+        geometryPayload = {
+          type: 'circle',
+          center: {
+            lat: selectedGeometry.center.lat,
+            lon: selectedGeometry.center.lon
+          },
+          radius: selectedGeometry.radius || 50 // default 50km if not specified
+        };
+      } else if (selectedGeometry.type === 'square' || selectedGeometry.type === 'rectangle') {
+        geometryPayload = {
+          type: selectedGeometry.type,
+          bounds: selectedGeometry.bounds
+        };
+      }
+
+      console.log('Requesting population for:', geometryPayload);
+
+      const response = await api.analyzePopulation({ geometry: geometryPayload });
+      
+      if (response.success) {
+        setPopulationData(response.data);
+        console.log('Population data received:', response.data);
+      } else {
+        console.error('Population analysis failed');
+        alert('Failed to analyze population');
+      }
+
+    } catch (error) {
+      console.error('Population request error:', error);
+      alert(`Population analysis error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoadingPopulation(false);
+    }
   };
 
   const handleWeatherAnalysis = async (params: any) => {
@@ -164,6 +232,8 @@ export default function Home() {
       <TimeScroller
         onDateChange={handleDateChange}
         onConfirm={handleDateConfirm}
+        selectedGeometry={selectedGeometry}
+        onPopulationRequest={handlePopulationRequest}
       />
 
       {/* Weather Layers Button */}
@@ -223,6 +293,13 @@ export default function Home() {
         onRainLayerToggle={setRainLayerEnabled}
         onOpacityChange={setRainLayerOpacity}
         rainLayerEnabled={rainLayerEnabled}
+      />
+
+      <PopulationResultModal
+        isOpen={isPopulationModalOpen}
+        onClose={() => setIsPopulationModalOpen(false)}
+        data={populationData}
+        isLoading={isLoadingPopulation}
       />
     </div>
   );

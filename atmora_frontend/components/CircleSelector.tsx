@@ -49,7 +49,12 @@ const CircleSelector = ({ icon, onShapeComplete }: CircleSelectorProps) => {
           
           // Notify parent about the selected center
           if (onShapeComplete) {
-            onShapeComplete(center, { type: 'circle', radius: finalRadius });
+            const radiusKm = finalRadius / 1000; // Convert meters to kilometers
+            onShapeComplete(center, { 
+              type: 'circle', 
+              center: { lat: center[0], lon: center[1] },
+              radius: radiusKm 
+            });
           }
         } else {
           // Reset and start new circle
