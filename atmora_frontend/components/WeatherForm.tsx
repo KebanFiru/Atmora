@@ -24,8 +24,8 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
   onAnalyze
 }) => {
   const [formData, setFormData] = useState<WeatherAnalysisParams>({
-    startDate: '2025-01-01',
-    endDate: '2025-12-31',
+    startDate: '2020-01-01',
+    endDate: '2024-12-31',
     parameters: ['T2M', 'WS10M', 'PRECTOT', 'HUMIDITY']
   });
 
@@ -173,9 +173,11 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                   <input
                     type="date"
                     value={formData.startDate}
+                    max="2024-12-31"
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Data available until Dec 31, 2024</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -184,9 +186,11 @@ const WeatherForm: React.FC<WeatherFormProps> = ({
                   <input
                     type="date"
                     value={formData.endDate}
+                    max="2024-12-31"
                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Maximum: Dec 31, 2024</p>
                 </div>
               </div>
 

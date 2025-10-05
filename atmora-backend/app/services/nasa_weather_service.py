@@ -23,37 +23,144 @@ import hashlib
 import base64
 import io
 
-# Cache sistemi
+# Cache sistemi - Optimized
 cache_dir = "cache"
 if not os.path.exists(cache_dir):
     os.makedirs(cache_dir)
 
 cache_lock = threading.Lock()
 
+# Cache configuration
+MAX_CACHE_SIZE_MB = 100  # Maximum cache size in MB
+MAX_CACHE_AGE_DAYS = 30  # Maximum cache age in days
+CACHE_CLEANUP_INTERVAL = 100  # Check cache every N operations
+
+# In-memory cache for frequently accessed data
+memory_cache = {}
+MAX_MEMORY_CACHE_ITEMS = 500
+
+# Cache operation counter
+cache_operation_counter = 0
+
 def get_cache_key(lat, lon, date_str):
     """Cache anahtarı oluştur"""
     key_string = f"{lat}_{lon}_{date_str}"
     return hashlib.md5(key_string.encode()).hexdigest()
 
+def get_cache_size_mb():
+    """Calculate total cache size in MB"""
+    total_size = 0
+    try:
+        for filename in os.listdir(cache_dir):
+            filepath = os.path.join(cache_dir, filename)
+            if os.path.isfile(filepath):
+                total_size += os.path.getsize(filepath)
+        return total_size / (1024 * 1024)  # Convert to MB
+    except:
+        return 0
+
+def cleanup_old_cache():
+    """Remove old cache files based on age and size limits"""
+    try:
+        cache_files = []
+        current_time = time.time()
+        max_age_seconds = MAX_CACHE_AGE_DAYS * 24 * 60 * 60
+        
+        # Collect all cache files with their stats
+        for filename in os.listdir(cache_dir):
+            filepath = os.path.join(cache_dir, filename)
+            if os.path.isfile(filepath) and filename.endswith('.json'):
+                file_stat = os.stat(filepath)
+                cache_files.append({
+                    'path': filepath,
+                    'size': file_stat.st_size,
+                    'mtime': file_stat.st_mtime,
+                    'age': current_time - file_stat.st_mtime
+                })
+        
+        # Remove files older than MAX_CACHE_AGE_DAYS
+        removed_old = 0
+        for file_info in cache_files[:]:
+            if file_info['age'] > max_age_seconds:
+                try:
+                    os.remove(file_info['path'])
+                    cache_files.remove(file_info)
+                    removed_old += 1
+                except:
+                    pass
+        
+        # If cache is still too large, remove oldest files (LRU)
+        cache_size_mb = sum(f['size'] for f in cache_files) / (1024 * 1024)
+        if cache_size_mb > MAX_CACHE_SIZE_MB:
+            # Sort by access time (oldest first)
+            cache_files.sort(key=lambda x: x['mtime'])
+            
+            removed_lru = 0
+            while cache_size_mb > MAX_CACHE_SIZE_MB * 0.8 and cache_files:  # Keep 80% after cleanup
+                file_to_remove = cache_files.pop(0)
+                try:
+                    os.remove(file_to_remove['path'])
+                    cache_size_mb -= file_to_remove['size'] / (1024 * 1024)
+                    removed_lru += 1
+                except:
+                    pass
+            
+            if removed_lru > 0:
+                print(f"🧹 Cache LRU cleanup: removed {removed_lru} files")
+        
+        if removed_old > 0:
+            print(f"🧹 Cache age cleanup: removed {removed_old} old files")
+            
+    except Exception as e:
+        print(f"⚠️ Cache cleanup error: {e}")
+
 def get_from_cache(cache_key):
-    """Cache'den veri oku"""
+    """Cache'den veri oku - Memory cache ile optimize edilmiş"""
+    global cache_operation_counter
+    
+    # Check memory cache first
+    if cache_key in memory_cache:
+        return memory_cache[cache_key]
+    
+    # Check file cache
     cache_file = os.path.join(cache_dir, f"{cache_key}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                
+            # Store in memory cache for faster access
+            if len(memory_cache) < MAX_MEMORY_CACHE_ITEMS:
+                memory_cache[cache_key] = data
+            
+            # Update file access time for LRU
+            os.utime(cache_file, None)
+            
+            return data
         except:
             return None
+    
+    # Periodic cleanup
+    cache_operation_counter += 1
+    if cache_operation_counter % CACHE_CLEANUP_INTERVAL == 0:
+        cleanup_old_cache()
+    
     return None
 
 def save_to_cache(cache_key, data):
-    """Cache'e veri kaydet"""
+    """Cache'e veri kaydet - Compact JSON ile"""
     cache_file = os.path.join(cache_dir, f"{cache_key}.json")
     try:
         with cache_lock:
+            # Save to file (compact format to save space)
             with open(cache_file, 'w') as f:
-                json.dump(data, f, indent=2)
-    except:
+                json.dump(data, f, separators=(',', ':'))  # Compact JSON
+            
+            # Also save to memory cache
+            if len(memory_cache) < MAX_MEMORY_CACHE_ITEMS:
+                memory_cache[cache_key] = data
+    except Exception as e:
+        print(f"⚠️ Cache save error: {e}")
         pass
 
 # Thread-safe adaptive rate limiting

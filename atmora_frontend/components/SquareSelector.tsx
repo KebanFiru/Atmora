@@ -8,6 +8,7 @@ type LatLng = [number, number];
 
 interface SquareSelectorProps {
   icon?: L.Icon | L.DivIcon;
+  onShapeComplete?: (center: [number, number], geometry?: any) => void;
 }
 
 // Convex Hull algorithm to ensure convex polygons
@@ -81,7 +82,7 @@ const calculatePolygonArea = (points: LatLng[]): number => {
   return area * degreeToKm * degreeToKm;
 };
 
-const SquareSelector = ({ icon }: SquareSelectorProps) => {
+const SquareSelector = ({ icon, onShapeComplete }: SquareSelectorProps) => {
   const [points, setPoints] = useState<LatLng[]>([]);
   const [cursorPosition, setCursorPosition] = useState<LatLng | null>(null);
 
@@ -95,6 +96,12 @@ const SquareSelector = ({ icon }: SquareSelectorProps) => {
           if (newPoints.length >= 3) {
             const convexPoints = convexHull([...newPoints]);
             setPoints(convexPoints);
+            
+            // Notify parent about center when shape is valid (3+ points)
+            const polygonCenter = calculatePolygonCentroid(convexPoints);
+            if (onShapeComplete) {
+              onShapeComplete(polygonCenter, { type: 'polygon', points: convexPoints });
+            }
           } else {
             setPoints(newPoints);
           }

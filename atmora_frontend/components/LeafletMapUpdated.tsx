@@ -78,13 +78,17 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     loadLeaflet();
   }, []);
 
-  const handleLocationSelect = (longitude: number, latitude: number) => {
-    onLocationSelect(longitude, latitude);
+  const handleLocationSelect = (longitude: number, latitude: number, geometry?: any) => {
+    onLocationSelect(longitude, latitude, geometry);
   };
 
   const handleMarkerPositionChange = (pos: [number, number]) => {
     setMarkerPosition(pos);
     handleLocationSelect(pos[1], pos[0]); // lng, lat
+  };
+
+  const handleShapeSelect = (center: [number, number], geometry?: any) => {
+    handleLocationSelect(center[1], center[0], geometry); // lng, lat
   };
 
   // Don't render until Leaflet is loaded
@@ -165,18 +169,21 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         {mode === 'square' && (
           <SquareSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
 
         {mode === 'circle' && (
           <CircleSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
 
         {mode === 'rectangle' && (
           <RectangleSelector
             icon={markerIcon}
+            onShapeComplete={handleShapeSelect}
           />
         )}
       </MapContainer>

@@ -8,9 +8,10 @@ type LatLng = [number, number];
 
 interface CircleSelectorProps {
   icon?: L.Icon | L.DivIcon;
+  onShapeComplete?: (center: [number, number], geometry?: any) => void;
 }
 
-const CircleSelector = ({ icon }: CircleSelectorProps) => {
+const CircleSelector = ({ icon, onShapeComplete }: CircleSelectorProps) => {
   const [center, setCenter] = useState<LatLng | null>(null);
   const [radius, setRadius] = useState<number>(0);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -45,6 +46,11 @@ const CircleSelector = ({ icon }: CircleSelectorProps) => {
           const finalRadius = calculateDistance(center, newPos);
           setRadius(finalRadius);
           setIsDrawing(false);
+          
+          // Notify parent about the selected center
+          if (onShapeComplete) {
+            onShapeComplete(center, { type: 'circle', radius: finalRadius });
+          }
         } else {
           // Reset and start new circle
           setCenter(newPos);

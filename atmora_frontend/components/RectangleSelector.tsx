@@ -9,9 +9,10 @@ type Bounds = [[number, number], [number, number]];
 
 interface RectangleSelectorProps {
   icon?: L.Icon | L.DivIcon;
+  onShapeComplete?: (center: [number, number], geometry?: any) => void;
 }
 
-const RectangleSelector = ({ icon }: RectangleSelectorProps) => {
+const RectangleSelector = ({ icon, onShapeComplete }: RectangleSelectorProps) => {
   const [startPoint, setStartPoint] = useState<LatLng | null>(null);
   const [endPoint, setEndPoint] = useState<LatLng | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -55,6 +56,12 @@ const RectangleSelector = ({ icon }: RectangleSelectorProps) => {
           // Second click - finalize rectangle
           setEndPoint(newPos);
           setIsDrawing(false);
+          
+          // Calculate and notify parent about center
+          const rectCenter = calculateCenter(startPoint, newPos);
+          if (onShapeComplete) {
+            onShapeComplete(rectCenter, { type: 'rectangle', bounds: createBounds(startPoint, newPos) });
+          }
         } else {
           // Reset and start new rectangle
           setStartPoint(newPos);

@@ -363,10 +363,17 @@ def list_tasks():
 @weather_bp.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    from app.services.nasa_weather_service import get_cache_size_mb, memory_cache
+    
     return jsonify({
         'status': 'healthy',
         'service': 'Atmora Weather Analysis API',
         'version': '1.0.0',
         'timestamp': datetime.now().isoformat(),
-        'active_tasks': len(active_tasks)
+        'active_tasks': len(active_tasks),
+        'cache_stats': {
+            'disk_cache_size_mb': round(get_cache_size_mb(), 2),
+            'memory_cache_items': len(memory_cache),
+            'memory_cache_limit': 500
+        }
     })
