@@ -24,12 +24,12 @@ LAG_DAYS = [1, 2, 3, 7, 14]
 @dataclass
 class PredictionResult:
     predictions: List[Dict[str, float]]
-    accuracy_score: float  # 0-100%
+    accuracy_score: float
     confidence_level: str  # "high", "medium", "low"
     days_from_2024: int
     target_date: str
     location: Dict[str, float]
-    chart: str = None  # Base64 encoded chart image
+    chart: str = None
 
 
 def calculate_accuracy_score(target_date: datetime) -> tuple[float, str]:
@@ -40,7 +40,6 @@ def calculate_accuracy_score(target_date: datetime) -> tuple[float, str]:
     reference_date = datetime(2024, 12, 31)
     days_diff = abs((target_date - reference_date).days)
     
-    # Linear decay: lose 1% per 3 days (roughly 10% per month)
     accuracy = max(20, 100 - (days_diff / 3.0))
     
     if accuracy >= 80:
@@ -87,9 +86,9 @@ def prepare_training_data(df: pd.DataFrame, lags: Iterable[int] = LAG_DAYS):
 
 def train_model(X: pd.DataFrame, y: pd.DataFrame) -> MultiOutputRegressor:
     base_model = HistGradientBoostingRegressor(
-        loss="squared_error", 
-        max_depth=12, 
-        learning_rate=0.05, 
+        loss="squared_error",
+        max_depth=12,
+        learning_rate=0.05,
         max_iter=400
     )
     model = MultiOutputRegressor(base_model)
@@ -158,8 +157,7 @@ def fetch_historical_data_dynamic(lat: float, lon: float, years: int = 10) -> pd
     """
     API_URL = "https://power.larc.nasa.gov/api/temporal/daily/point"
     
-    # Calculate date range
-    end_date = datetime(2024, 12, 31)  # NASA data available until end of 2024
+    end_date = datetime(2024, 12, 31)
     start_date = end_date - timedelta(days=years*365)
     
     start_str = start_date.strftime("%Y%m%d")
@@ -190,7 +188,6 @@ def fetch_historical_data_dynamic(lat: float, lon: float, years: int = 10) -> pd
         data = response.json()
         parameter_data = data.get("properties", {}).get("parameter", {})
         
-        # Get all dates
         dates = sorted(set(parameter_data.get("T2M", {}).keys()))
         
         records = []
@@ -211,7 +208,6 @@ def fetch_historical_data_dynamic(lat: float, lon: float, years: int = 10) -> pd
         df = pd.DataFrame(records)
         df['date'] = pd.to_datetime(df['date'])
         
-        # Remove rows with missing values
         initial_count = len(df)
         df = df.dropna()
         removed = initial_count - len(df)
@@ -247,45 +243,34 @@ def fetch_historical_data(lat: float, lon: float, climate_type: str = "mediterra
     """
     import os
     
-    # Map climate types to data files
     climate_data_files = {
-        "mediterranean": "izmir_nasa_data.csv",  # Akdeniz iklimi - İzmir gerçek verisi (2021-2024, avg 18°C)
-        # Gelecekte eklenecek:
-        # "tropical": "tropical_nasa_data.csv",
-        # "continental": "continental_nasa_data.csv",
-        # "temperate": "italy_nasa_data.csv",  # Ilıman iklim (UK/Italy)
+        "mediterranean": "izmir_nasa_data.csv",
     }
     
-    # Default to mediterranean if type not found
     if climate_type not in climate_data_files:
         logger.warning(f"Climate type '{climate_type}' not found, using Mediterranean data")
         climate_type = "mediterranean"
     
-    # Build path to data file
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     data_path = os.path.join(base_dir, 'instance', 'static', climate_data_files[climate_type])
     
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Climate data file not found: {data_path}")
     
-    # Load CSV data
     logger.info(f"Loading {climate_type} climate data from {climate_data_files[climate_type]}")
     df = pd.read_csv(data_path)
     df['date'] = pd.to_datetime(df['date'])
     
-    # Verify required columns exist
     required_cols = ['date', 'temperature', 'wind_speed', 'precipitation', 'humidity']
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns in data: {missing_cols}")
     
-    # Sort by date and reset index
     df = df.sort_values('date').reset_index(drop=True)
     
     logger.info(f"✅ Loaded {len(df)} days of {climate_type} climate data")
     logger.info(f"   Date range: {df['date'].min()} to {df['date'].max()}")
     
-    # Ensure latitude and longitude columns exist (use from CSV or provided values)
     if 'latitude' not in df.columns:
         df['latitude'] = lat
     if 'longitude' not in df.columns:
@@ -311,7 +296,6 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
     """
     target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
     
-    # Calculate accuracy based on distance from 2024
     accuracy_score, confidence_level = calculate_accuracy_score(target_date)
     days_from_2024 = (target_date - datetime(2024, 12, 31)).days
     
@@ -319,7 +303,6 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
     logger.info(f"   Data Mode: {'DYNAMIC (Real-time NASA API)' if use_dynamic_data else f'STATIC ({climate_type})'}")
     logger.info(f"   Accuracy: {accuracy_score}%")
     
-    # Fetch historical data - either dynamic or static
     if use_dynamic_data:
         logger.info("📡 Fetching location-specific data from NASA POWER API...")
         df = fetch_historical_data_dynamic(lat, lon, years=10)
@@ -327,11 +310,9 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
         logger.info(f"📁 Loading pre-collected {climate_type} climate data...")
         df = fetch_historical_data(lat, lon, climate_type=climate_type)
     
-    # Get last available date in historical data
     last_historical_date = df['date'].max()
     logger.info(f"   Last historical date: {last_historical_date}")
     
-    # Calculate how many days we need to predict to reach target_date
     days_to_predict = (target_date - last_historical_date).days
     
     if days_to_predict <= 0:
@@ -339,23 +320,17 @@ def predict_weather(lat: float, lon: float, target_date_str: str, horizon: int =
     
     logger.info(f"   Days to predict: {days_to_predict} (from {last_historical_date.strftime('%Y-%m-%d')} to {target_date_str})")
     
-    # Total predictions needed: reach target_date + horizon days
     total_days_to_predict = days_to_predict + horizon - 1
     
-    # Train model on historical data
     X, y, feature_columns = prepare_training_data(df)
     model = train_model(X, y)
     
-    # Make predictions from last historical date to target_date + horizon
     all_predictions = forecast_next_days(df, model, feature_columns, horizon=total_days_to_predict)
     
-    # Extract only the predictions starting from target_date
-    # Skip the first (days_to_predict - 1) predictions
     predictions = all_predictions[days_to_predict - 1:days_to_predict - 1 + horizon]
     
     logger.info(f"✅ Generated {len(predictions)} predictions starting from {target_date_str}")
     
-    # Generate visualization chart
     chart_base64 = None
     try:
         from .visualization_service import create_prediction_chart

@@ -16,7 +16,6 @@ from datetime import datetime
 
 weather_bp = Blueprint('weather', __name__)
 
-# Global değişkenler
 active_tasks = {}
 
 class ProgressTracker:
@@ -24,7 +23,7 @@ class ProgressTracker:
         self.task_id = task_id
         self.progress = 0
         self.total = 0
-        self.status = "başlıyor"
+        self.status = "starting"
         self.result = None
         self.error = None
         self.start_time = time.time()
@@ -32,7 +31,7 @@ class ProgressTracker:
     def update(self, current, total):
         self.progress = current
         self.total = total
-        self.status = f"{current}/{total} tamamlandı"
+        self.status = f"{current}/{total} completed"
 
 @weather_bp.route('/analyze', methods=['POST'])
 def analyze_weather():
@@ -49,13 +48,11 @@ def analyze_weather():
     try:
         data = request.json
         
-        # Veriyi doğrula
         required_fields = ['latitude', 'longitude', 'startDate', 'endDate']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Eksik alan: {field}'}), 400
         
-        # Tarih doğrulaması
         try:
             start_date = datetime.strptime(data['startDate'], '%Y-%m-%d')
             end_date = datetime.strptime(data['endDate'], '%Y-%m-%d')
@@ -63,56 +60,50 @@ def analyze_weather():
             if start_date > end_date:
                 return jsonify({'error': 'Başlangıç tarihi bitiş tarihinden sonra olamaz'}), 400
             
-            # Maksimum 1 yıl sınırı
             if (end_date - start_date).days > 365:
                 return jsonify({'error': 'Maksimum 1 yıllık veri analizi yapılabilir'}), 400
                 
         except ValueError:
-            return jsonify({'error': 'Geçersiz tarih formatı. YYYY-MM-DD formatını kullanın'}), 400
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
         
-        # Koordinat doğrulaması
         try:
             lat = float(data['latitude'])
             lon = float(data['longitude'])
             
             if not (-90 <= lat <= 90):
-                return jsonify({'error': 'Enlem -90 ile 90 arasında olmalıdır'}), 400
+                return jsonify({'error': 'Latitude must be between -90 and 90'}), 400
             if not (-180 <= lon <= 180):
-                return jsonify({'error': 'Boylam -180 ile 180 arasında olmalıdır'}), 400
+                return jsonify({'error': 'Longitude must be between -180 and 180'}), 400
                 
         except (ValueError, TypeError):
-            return jsonify({'error': 'Geçersiz koordinat değerleri'}), 400
+            return jsonify({'error': 'Invalid coordinate values'}), 400
         
-        # Task ID oluştur
         task_id = str(uuid.uuid4())
         
-        # Progress tracker oluştur
         tracker = ProgressTracker(task_id)
         active_tasks[task_id] = tracker
         
-        # Arkaplan thread başlat
         thread = threading.Thread(
             target=process_weather_data,
             args=(data, tracker)
         )
-        thread.daemon = True  # Ana program kapandığında thread'i sonlandır
+        thread.daemon = True
         thread.start()
         
         return jsonify({
             'task_id': task_id,
-            'status': 'başladı',
+            'status': 'started',
             'message': 'Hava durumu analizi başlatıldı'
         })
         
     except Exception as e:
-        return jsonify({'error': f'Beklenmeyen hata: {str(e)}'}), 500
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 def process_weather_data(data, tracker):
     """Background task for processing weather data"""
     try:
-        tracker.status = "NASA API'den veri toplama başlıyor"
+        tracker.status = "NASA API'den veri toplama starting"
         
-        # NASA API'den veri çek
         result = get_point_data_for_period(
             data['latitude'], data['longitude'],
             data['startDate'], data['endDate'],
@@ -121,30 +112,27 @@ def process_weather_data(data, tracker):
         
         tracker.status = "grafikler oluşturuluyor"
         
-        # Grafikleri oluştur
         charts = create_weather_charts(result)
         result['charts'] = charts
         
-        # Kullanıcı dostu özet oluştur
         summary = create_user_summary(result)
         result['summary'] = summary
         
         tracker.result = result
-        tracker.status = "tamamlandı"
+        tracker.status = "completed"
         
-        print(f"✅ Task {tracker.task_id} tamamlandı: {len(result['all_data'])} veri noktası")
+        print(f"✅ Task {tracker.task_id} completed: {len(result['all_data'])} veri noktası")
         
     except Exception as e:
         tracker.error = str(e)
-        tracker.status = "hata"
-        print(f"❌ Task {tracker.task_id} hatası: {e}")
+        tracker.status = "error"
+        print(f"❌ Task {tracker.task_id} errorsı: {e}")
 
 def create_user_summary(result):
     """Create a user-friendly summary of the weather analysis"""
     stats = result['statistics']
     risks = result['risk_analysis']
     
-    # Temel istatistikler
     summary = {
         'overview': {
             'total_days': result['total_points'],
@@ -175,7 +163,7 @@ def create_user_summary(result):
 def get_progress(task_id):
     """Get progress status of a weather analysis task"""
     if task_id not in active_tasks:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
     
     tracker = active_tasks[task_id]
     
@@ -188,7 +176,6 @@ def get_progress(task_id):
         'elapsed_time': int(time.time() - tracker.start_time)
     }
     
-    # Başarılı sonuç varsa ekle
     if tracker.result:
         response['completed'] = True
         response['summary'] = tracker.result.get('summary', {})
@@ -196,7 +183,6 @@ def get_progress(task_id):
         response['risk_analysis'] = tracker.result.get('risk_analysis', {})
         response['statistics'] = tracker.result.get('statistics', {})
         
-    # Hata varsa ekle
     if tracker.error:
         response['error'] = tracker.error
         response['completed'] = False
@@ -207,7 +193,7 @@ def get_progress(task_id):
 def get_result(task_id):
     """Get full results of a completed weather analysis"""
     if task_id not in active_tasks:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
     
     tracker = active_tasks[task_id]
     
@@ -217,7 +203,6 @@ def get_result(task_id):
     if tracker.error:
         return jsonify({'error': tracker.error}), 500
     
-    # Full result döndür (grafikleri de içerir)
     return jsonify({
         'task_id': task_id,
         'status': 'completed',
@@ -228,7 +213,7 @@ def get_result(task_id):
 def export_data(task_id, format):
     """Export weather analysis data in CSV or JSON format"""
     if task_id not in active_tasks:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
     
     tracker = active_tasks[task_id]
     if not tracker.result:
@@ -242,7 +227,7 @@ def export_data(task_id, format):
         else:
             return jsonify({'error': 'Desteklenmeyen format. csv veya json kullanın'}), 400
     except Exception as e:
-        return jsonify({'error': f'Export hatası: {str(e)}'}), 500
+        return jsonify({'error': f'Export errorsı: {str(e)}'}), 500
 
 def export_json(result, task_id):
     """Export data in JSON format"""
@@ -265,7 +250,6 @@ def export_json(result, task_id):
         'daily_data': result.get('all_data', [])
     }
     
-    # Temporary file oluştur
     temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
     try:
         json.dump(export_data, temp_file, indent=2, ensure_ascii=False)
@@ -278,7 +262,6 @@ def export_json(result, task_id):
             mimetype='application/json'
         )
     finally:
-        # Cleanup
         if os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
 
@@ -287,13 +270,11 @@ def export_csv(result, task_id):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"atmora_weather_data_{task_id[:8]}_{timestamp}.csv"
     
-    # Temporary file oluştur
     temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8', newline='')
     
     try:
         writer = csv.writer(temp_file)
         
-        # Header
         writer.writerow([
             'Date',
             'Latitude',
@@ -304,7 +285,6 @@ def export_csv(result, task_id):
             'Humidity (%)'
         ])
         
-        # Data rows
         all_data = result.get('all_data', [])
         for point in all_data:
             writer.writerow([
@@ -326,7 +306,6 @@ def export_csv(result, task_id):
             mimetype='text/csv'
         )
     finally:
-        # Cleanup
         if os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
 
@@ -335,9 +314,9 @@ def cleanup_task(task_id):
     """Clean up completed task data"""
     if task_id in active_tasks:
         del active_tasks[task_id]
-        return jsonify({'status': 'temizlendi', 'task_id': task_id})
+        return jsonify({'status': 'cleaned', 'task_id': task_id})
     else:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
 
 @weather_bp.route('/tasks', methods=['GET'])
 def list_tasks():
@@ -360,7 +339,6 @@ def list_tasks():
         'tasks': task_list
     })
 
-# Health check endpoint
 @weather_bp.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

@@ -12,7 +12,6 @@ from app.services.prediction_service import predict_weather, PredictionResult
 
 prediction_bp = Blueprint('prediction', __name__)
 
-# Global variables for async predictions
 active_predictions = {}
 
 
@@ -20,7 +19,7 @@ class PredictionTracker:
     def __init__(self, task_id):
         self.task_id = task_id
         self.progress = 0
-        self.status = "başlıyor"
+        self.status = "starting"
         self.result = None
         self.error = None
         self.start_time = time.time()
@@ -32,11 +31,11 @@ def forecast_weather():
     Start weather prediction for a future date using real-time NASA data
     Expected JSON payload:
     {
-        "latitude": float,  # Exact latitude of selected location
-        "longitude": float,  # Exact longitude of selected location
-        "targetDate": "YYYY-MM-DD",  # Future date to predict
-        "horizon": int (optional, default 1),  # Number of days to predict
-        "use_dynamic_data": bool (optional, default True)  # Use real-time NASA API
+        "latitude": float,
+        "longitude": float,
+        "targetDate": "YYYY-MM-DD",
+        "horizon": int (optional, default 1),
+        "use_dynamic_data": bool (optional, default True)
     }
     
     Data modes:
@@ -46,51 +45,43 @@ def forecast_weather():
     try:
         data = request.json
         
-        # Validate required fields
         required_fields = ['latitude', 'longitude', 'targetDate']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Eksik alan: {field}'}), 400
         
-        # Validate coordinates
         try:
             lat = float(data['latitude'])
             lon = float(data['longitude'])
             
             if not (-90 <= lat <= 90):
-                return jsonify({'error': 'Enlem -90 ile 90 arasında olmalıdır'}), 400
+                return jsonify({'error': 'Latitude must be between -90 and 90'}), 400
             if not (-180 <= lon <= 180):
-                return jsonify({'error': 'Boylam -180 ile 180 arasında olmalıdır'}), 400
+                return jsonify({'error': 'Longitude must be between -180 and 180'}), 400
         except (ValueError, TypeError):
-            return jsonify({'error': 'Geçersiz koordinat değerleri'}), 400
+            return jsonify({'error': 'Invalid coordinate values'}), 400
         
-        # Validate date
         try:
             target_date = datetime.strptime(data['targetDate'], '%Y-%m-%d')
             
-            # Must be after training data end date (2024-12-31)
             training_end_date = datetime(2024, 12, 31)
             if target_date <= training_end_date:
                 return jsonify({'error': 'Hedef tarih 2025-01-01 veya sonrası olmalıdır (eğitim verisi 2024-12-31\'de bitiyor)'}), 400
             
-            # Optional: limit to reasonable future (e.g., 1 year)
             max_prediction_date = datetime(2025, 12, 31)
             if target_date > max_prediction_date:
-                return jsonify({'error': 'Hedef tarih en fazla 2025-12-31 olabilir (makul doğruluk için)'}), 400
+                return jsonify({'error': 'Target date cannot exceed 2025-12-31 (for reasonable accuracy)'}), 400
                 
         except ValueError:
-            return jsonify({'error': 'Geçersiz tarih formatı. YYYY-MM-DD formatını kullanın'}), 400
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
         
         horizon = data.get('horizon', 1)
         
-        # Create task ID
         task_id = str(uuid.uuid4())
         
-        # Create progress tracker
         tracker = PredictionTracker(task_id)
         active_predictions[task_id] = tracker
         
-        # Start background thread
         thread = threading.Thread(
             target=process_prediction,
             args=(data, tracker)
@@ -100,24 +91,23 @@ def forecast_weather():
         
         return jsonify({
             'task_id': task_id,
-            'status': 'başladı',
-            'message': 'Hava durumu tahmini başlatıldı'
+            'status': 'started',
+            'message': 'Weather prediction initiated'
         })
         
     except Exception as e:
-        return jsonify({'error': f'Beklenmeyen hata: {str(e)}'}), 500
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 
 def process_prediction(data, tracker):
     """Background task for processing prediction"""
     try:
-        # Check if dynamic data fetching is enabled (default: True)
         use_dynamic = data.get('use_dynamic_data', True)
         
         if use_dynamic:
-            tracker.status = "NASA POWER API'den 10 yıllık veri çekiliyor..."
+            tracker.status = "Fetching 10 years of data from NASA POWER API..."
         else:
-            tracker.status = "Akdeniz iklimi verisi yükleniyor (4 yıllık)"
+            tracker.status = "Loading Mediterranean climate data (4 years)"
         
         tracker.progress = 10
         
@@ -131,9 +121,8 @@ def process_prediction(data, tracker):
         )
         
         tracker.progress = 90
-        tracker.status = "Sonuçlar hazırlanıyor"
+        tracker.status = "Preparing results"
         
-        # Create user-friendly response
         prediction_summary = create_prediction_summary(result)
         
         tracker.result = {
@@ -144,17 +133,17 @@ def process_prediction(data, tracker):
             'target_date': result.target_date,
             'location': result.location,
             'summary': prediction_summary,
-            'chart': result.chart  # Base64 encoded chart
+            'chart': result.chart
         }
         tracker.progress = 100
-        tracker.status = "tamamlandı"
+        tracker.status = "completed"
         
-        print(f"✅ Prediction {tracker.task_id} tamamlandı")
+        print(f"✅ Prediction {tracker.task_id} completed")
         
     except Exception as e:
         tracker.error = str(e)
-        tracker.status = "hata"
-        print(f"❌ Prediction {tracker.task_id} hatası: {e}")
+        tracker.status = "error"
+        print(f"❌ Prediction {tracker.task_id} errorsı: {e}")
 
 
 def create_prediction_summary(result: PredictionResult) -> dict:
@@ -162,36 +151,34 @@ def create_prediction_summary(result: PredictionResult) -> dict:
     if not result.predictions:
         return {}
     
-    pred = result.predictions[0]  # First day prediction
+    pred = result.predictions[0]
     
-    # Weather condition classification
     temp = pred['temperature']
     if temp > 30:
-        temp_desc = "çok sıcak"
+        temp_desc = "very hot"
     elif temp > 20:
-        temp_desc = "ılık"
+        temp_desc = "warm"
     elif temp > 10:
-        temp_desc = "serin"
+        temp_desc = "cool"
     else:
-        temp_desc = "soğuk"
+        temp_desc = "cold"
     
     wind = pred['wind_speed']
     if wind > 15:
-        wind_desc = "çok rüzgarlı"
+        wind_desc = "very windy"
     elif wind > 8:
-        wind_desc = "rüzgarlı"
+        wind_desc = "windy"
     else:
-        wind_desc = "sakin"
+        wind_desc = "calm"
     
     precip = pred['precipitation']
     if precip > 10:
-        precip_desc = "yağmurlu"
+        precip_desc = "rainy"
     elif precip > 2:
-        precip_desc = "hafif yağışlı"
+        precip_desc = "light rain"
     else:
-        precip_desc = "kuru"
+        precip_desc = "dry"
     
-    # Accuracy bar color
     if result.accuracy_score >= 80:
         accuracy_color = "green"
     elif result.accuracy_score >= 50:
@@ -232,18 +219,18 @@ def create_prediction_summary(result: PredictionResult) -> dict:
 def get_accuracy_warning(days_from_2024: int, accuracy: float) -> str:
     """Generate warning message based on accuracy"""
     if accuracy >= 80:
-        return "✅ Yüksek doğruluk - Tahmin güvenilir"
+        return "✅ High accuracy - Prediction is reliable"
     elif accuracy >= 50:
-        return "⚠️ Orta doğruluk - Tahmin referans amaçlıdır"
+        return "⚠️ Medium accuracy - Prediction is for reference"
     else:
-        return "❌ Düşük doğruluk - Tahmin çok belirsiz, sadece genel fikir verir"
+        return "❌ Low accuracy - Prediction is very uncertain, general idea only"
 
 
 @prediction_bp.route('/progress/<task_id>', methods=['GET'])
 def get_prediction_progress(task_id):
     """Get progress status of a prediction task"""
     if task_id not in active_predictions:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
     
     tracker = active_predictions[task_id]
     
@@ -270,9 +257,9 @@ def cleanup_prediction(task_id):
     """Clean up completed prediction task"""
     if task_id in active_predictions:
         del active_predictions[task_id]
-        return jsonify({'status': 'temizlendi', 'task_id': task_id})
+        return jsonify({'status': 'cleaned', 'task_id': task_id})
     else:
-        return jsonify({'error': 'Task bulunamadı'}), 404
+        return jsonify({'error': 'Task not found'}), 404
 
 
 @prediction_bp.route('/accuracy-test', methods=['POST'])
@@ -290,9 +277,8 @@ def accuracy_test():
     try:
         data = request.json
         
-        # Validate required fields
         if 'latitude' not in data or 'longitude' not in data:
-            return jsonify({'error': 'Latitude ve longitude gerekli'}), 400
+            return jsonify({'error': 'Latitude and longitude are required'}), 400
         
         lat = float(data['latitude'])
         lon = float(data['longitude'])
@@ -301,7 +287,6 @@ def accuracy_test():
         
         print(f"🧪 Starting accuracy test for ({lat}, {lon})")
         
-        # Run accuracy test
         from app.services.accuracy_test_service import test_prediction_accuracy
         result = test_prediction_accuracy(lat, lon, test_months, use_dynamic)
         

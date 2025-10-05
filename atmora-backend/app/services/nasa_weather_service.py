@@ -11,7 +11,7 @@ import json
 import os
 from functools import wraps
 import matplotlib
-matplotlib.use('Agg')  # Non-GUI backend for server
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
@@ -23,27 +23,23 @@ import hashlib
 import base64
 import io
 
-# Cache sistemi - Optimized
 cache_dir = "cache"
 if not os.path.exists(cache_dir):
     os.makedirs(cache_dir)
 
 cache_lock = threading.Lock()
 
-# Cache configuration
-MAX_CACHE_SIZE_MB = 100  # Maximum cache size in MB
-MAX_CACHE_AGE_DAYS = 30  # Maximum cache age in days
-CACHE_CLEANUP_INTERVAL = 100  # Check cache every N operations
+MAX_CACHE_SIZE_MB = 100
+MAX_CACHE_AGE_DAYS = 30
+CACHE_CLEANUP_INTERVAL = 100
 
-# In-memory cache for frequently accessed data
 memory_cache = {}
 MAX_MEMORY_CACHE_ITEMS = 500
 
-# Cache operation counter
 cache_operation_counter = 0
 
 def get_cache_key(lat, lon, date_str):
-    """Cache anahtarı oluştur"""
+    """Generate cache key"""
     key_string = f"{lat}_{lon}_{date_str}"
     return hashlib.md5(key_string.encode()).hexdigest()
 
@@ -55,7 +51,7 @@ def get_cache_size_mb():
             filepath = os.path.join(cache_dir, filename)
             if os.path.isfile(filepath):
                 total_size += os.path.getsize(filepath)
-        return total_size / (1024 * 1024)  # Convert to MB
+        return total_size / (1024 * 1024)
     except:
         return 0
 
@@ -66,7 +62,6 @@ def cleanup_old_cache():
         current_time = time.time()
         max_age_seconds = MAX_CACHE_AGE_DAYS * 24 * 60 * 60
         
-        # Collect all cache files with their stats
         for filename in os.listdir(cache_dir):
             filepath = os.path.join(cache_dir, filename)
             if os.path.isfile(filepath) and filename.endswith('.json'):
@@ -78,7 +73,6 @@ def cleanup_old_cache():
                     'age': current_time - file_stat.st_mtime
                 })
         
-        # Remove files older than MAX_CACHE_AGE_DAYS
         removed_old = 0
         for file_info in cache_files[:]:
             if file_info['age'] > max_age_seconds:
@@ -89,14 +83,12 @@ def cleanup_old_cache():
                 except:
                     pass
         
-        # If cache is still too large, remove oldest files (LRU)
         cache_size_mb = sum(f['size'] for f in cache_files) / (1024 * 1024)
         if cache_size_mb > MAX_CACHE_SIZE_MB:
-            # Sort by access time (oldest first)
             cache_files.sort(key=lambda x: x['mtime'])
             
             removed_lru = 0
-            while cache_size_mb > MAX_CACHE_SIZE_MB * 0.8 and cache_files:  # Keep 80% after cleanup
+            while cache_size_mb > MAX_CACHE_SIZE_MB * 0.8 and cache_files:
                 file_to_remove = cache_files.pop(0)
                 try:
                     os.remove(file_to_remove['path'])
@@ -115,32 +107,27 @@ def cleanup_old_cache():
         print(f"⚠️ Cache cleanup error: {e}")
 
 def get_from_cache(cache_key):
-    """Cache'den veri oku - Memory cache ile optimize edilmiş"""
+    """Read data from cache - Optimized with memory cache"""
     global cache_operation_counter
     
-    # Check memory cache first
     if cache_key in memory_cache:
         return memory_cache[cache_key]
     
-    # Check file cache
     cache_file = os.path.join(cache_dir, f"{cache_key}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
                 
-            # Store in memory cache for faster access
             if len(memory_cache) < MAX_MEMORY_CACHE_ITEMS:
                 memory_cache[cache_key] = data
             
-            # Update file access time for LRU
             os.utime(cache_file, None)
             
             return data
         except:
             return None
     
-    # Periodic cleanup
     cache_operation_counter += 1
     if cache_operation_counter % CACHE_CLEANUP_INTERVAL == 0:
         cleanup_old_cache()
@@ -152,18 +139,15 @@ def save_to_cache(cache_key, data):
     cache_file = os.path.join(cache_dir, f"{cache_key}.json")
     try:
         with cache_lock:
-            # Save to file (compact format to save space)
             with open(cache_file, 'w') as f:
-                json.dump(data, f, separators=(',', ':'))  # Compact JSON
+                json.dump(data, f, separators=(',', ':'))
             
-            # Also save to memory cache
             if len(memory_cache) < MAX_MEMORY_CACHE_ITEMS:
                 memory_cache[cache_key] = data
     except Exception as e:
         print(f"⚠️ Cache save error: {e}")
         pass
 
-# Thread-safe adaptive rate limiting
 class AdaptiveRateLimiter:
     def __init__(self, initial_calls_per_second=1):
         self.calls_per_second = initial_calls_per_second
@@ -182,15 +166,15 @@ class AdaptiveRateLimiter:
             self.last_called = time.time()
     
     def report_429(self):
-        """429 hatası aldığında rate limiting'i yavaşlat"""
+        """Slow down rate limiting when receiving 429 error"""
         with self.lock:
             self.consecutive_429s += 1
             self.calls_per_second = max(0.2, self.calls_per_second * 0.5)
             self.min_interval = 1.0 / self.calls_per_second
-            print(f"⚠️ Rate limit düşürüldü: {self.calls_per_second:.2f} calls/sec")
+            print(f"⚠️ Rate limit reduced: {self.calls_per_second:.2f} calls/sec")
     
     def report_success(self):
-        """Başarılı çağrıda rate'i yavaşça artır"""
+        """Slowly increase rate on successful calls"""
         with self.lock:
             self.last_success_time = time.time()
             if self.consecutive_429s > 0:
@@ -199,11 +183,10 @@ class AdaptiveRateLimiter:
                     self.calls_per_second = min(2.0, self.calls_per_second * 1.1)
                     self.min_interval = 1.0 / self.calls_per_second
 
-# Global adaptive rate limiter
 rate_limiter = AdaptiveRateLimiter(initial_calls_per_second=0.8)
 
 def smart_retry(max_retries=5, base_delay=2):
-    """429 hatalarına özel akıllı retry decorator"""
+    """429 error smart retry decorator"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -216,10 +199,10 @@ def smart_retry(max_retries=5, base_delay=2):
                     if e.response.status_code == 429:
                         rate_limiter.report_429()
                         wait_time = base_delay * (3 ** attempt) + (attempt * 2)
-                        print(f"🔄 429 Hatası - Deneme {attempt + 1}/{max_retries}, {wait_time}s bekleniyor...")
+                        print(f"🔄 429 Error - Retry {attempt + 1}/{max_retries}, {wait_time}s waiting...")
                         time.sleep(wait_time)
                     else:
-                        print(f"🔄 HTTP Hatası {e.response.status_code} - Deneme {attempt + 1}/{max_retries}")
+                        print(f"🔄 HTTP Error {e.response.status_code} - Retry {attempt + 1}/{max_retries}")
                         time.sleep(base_delay * (2 ** attempt))
                     
                     if attempt == max_retries - 1:
@@ -227,7 +210,7 @@ def smart_retry(max_retries=5, base_delay=2):
                 except Exception as e:
                     if attempt == max_retries - 1:
                         raise e
-                    print(f"🔄 Genel Hata - Deneme {attempt + 1}/{max_retries}: {e}")
+                    print(f"🔄 Genel Hata - Retry {attempt + 1}/{max_retries}: {e}")
                     time.sleep(base_delay * (2 ** attempt))
             return None
         return wrapper
@@ -241,13 +224,11 @@ def daterange(start_date, end_date):
 @smart_retry(max_retries=5, base_delay=3)
 def get_point_data(lat, lon, date_str):
     """Tek nokta için NASA POWER point sorgusu - cache ve rate limiting ile"""
-    # Cache kontrolü
     cache_key = get_cache_key(lat, lon, date_str)
     cached_data = get_from_cache(cache_key)
     if cached_data:
         return cached_data
     
-    # Rate limiting
     rate_limiter.wait_if_needed()
     
     date_api = datetime.strptime(date_str, "%Y-%m-%d").strftime("%Y%m%d")
@@ -267,7 +248,6 @@ def get_point_data(lat, lon, date_str):
     data = response.json()
     params_data = data["properties"]["parameter"]
     
-    # Verileri hazırla
     result = {
         "temperature": list(params_data["T2M"].values())[0],
         "wind_speed": list(params_data["WS10M"].values())[0],
@@ -278,7 +258,6 @@ def get_point_data(lat, lon, date_str):
         "date": date_str
     }
     
-    # Cache'e kaydet
     save_to_cache(cache_key, result)
     return result
 
@@ -288,9 +267,8 @@ def fetch_data_parallel(coordinates_list, max_workers=2):
     failed_coords = []
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Future'ları hazırla
         future_to_coord = {
-            executor.submit(get_point_data, coord[0], coord[1], coord[2]): coord 
+            executor.submit(get_point_data, coord[0], coord[1], coord[2]): coord
             for coord in coordinates_list
         }
         
@@ -309,10 +287,8 @@ def calculate_statistics(all_data):
     if not all_data:
         raise Exception("Hiç veri alınamadı.")
     
-    # İlk parametreleri al
     keys = [k for k in all_data[0].keys() if k not in ['lat', 'lon', 'date']]
     
-    # Memory efficient hesaplama
     stats = {}
     for key in keys:
         values = [d[key] for d in all_data if key in d and d[key] is not None]
@@ -331,19 +307,17 @@ def calculate_weather_risks(all_data):
     if not all_data:
         return {}
     
-    # Threshold değerleri (extreme weather events)
     thresholds = {
-        'very_hot': 32.2,      # 90°F = 32.2°C
-        'very_cold': 0.0,      # 32°F = 0°C
-        'very_windy': 15.0,    # 15 m/s (~33 mph)
-        'very_wet': 10.0,      # 10mm yağış
-        'very_humid': 85.0     # %85 nem (uncomfortable)
+        'very_hot': 32.2,
+        'very_cold': 0.0,
+        'very_windy': 15.0,
+        'very_wet': 10.0,
+        'very_humid': 85.0
     }
     
     total_points = len(all_data)
     risks = {}
     
-    # Very Hot Risk
     hot_count = sum(1 for d in all_data if d.get('temperature', 0) > thresholds['very_hot'])
     risks['very_hot'] = {
         'probability': (hot_count / total_points) * 100,
@@ -352,7 +326,6 @@ def calculate_weather_risks(all_data):
         'risk_level': 'high' if hot_count/total_points > 0.3 else 'medium' if hot_count/total_points > 0.1 else 'low'
     }
     
-    # Very Cold Risk
     cold_count = sum(1 for d in all_data if d.get('temperature', 0) < thresholds['very_cold'])
     risks['very_cold'] = {
         'probability': (cold_count / total_points) * 100,
@@ -361,7 +334,6 @@ def calculate_weather_risks(all_data):
         'risk_level': 'high' if cold_count/total_points > 0.3 else 'medium' if cold_count/total_points > 0.1 else 'low'
     }
     
-    # Very Windy Risk
     windy_count = sum(1 for d in all_data if d.get('wind_speed', 0) > thresholds['very_windy'])
     risks['very_windy'] = {
         'probability': (windy_count / total_points) * 100,
@@ -370,7 +342,6 @@ def calculate_weather_risks(all_data):
         'risk_level': 'high' if windy_count/total_points > 0.3 else 'medium' if windy_count/total_points > 0.1 else 'low'
     }
     
-    # Very Wet Risk
     wet_count = sum(1 for d in all_data if d.get('precipitation', 0) > thresholds['very_wet'])
     risks['very_wet'] = {
         'probability': (wet_count / total_points) * 100,
@@ -379,7 +350,6 @@ def calculate_weather_risks(all_data):
         'risk_level': 'high' if wet_count/total_points > 0.3 else 'medium' if wet_count/total_points > 0.1 else 'low'
     }
     
-    # Very Humid Risk (uncomfortable)
     humid_count = sum(1 for d in all_data if d.get('humidity', 0) > thresholds['very_humid'])
     risks['very_uncomfortable'] = {
         'probability': (humid_count / total_points) * 100,
@@ -388,7 +358,6 @@ def calculate_weather_risks(all_data):
         'risk_level': 'high' if humid_count/total_points > 0.3 else 'medium' if humid_count/total_points > 0.1 else 'low'
     }
     
-    # Overall risk assessment
     high_risk_count = sum(1 for risk in risks.values() if risk['risk_level'] == 'high')
     risks['overall_assessment'] = {
         'risk_level': 'high' if high_risk_count >= 2 else 'medium' if high_risk_count == 1 else 'low',
@@ -406,10 +375,10 @@ def get_risk_recommendation(risks):
     
     recommendations = {
         'very_hot': "🌡️ Aşırı sıcak olabilir. Bol su için ve gölgelik alanları tercih edin.",
-        'very_cold': "🥶 Çok soğuk olabilir. Sıcak giyinin ve soğuk hava ekipmanları getirin.",
-        'very_windy': "💨 Çok rüzgarlı olabilir. Açık alanda aktivite planlarınızı gözden geçirin.",
+        'very_cold': "🥶 Çok cold olabilir. Sıcak giyinin ve cold hava ekipmanları getirin.",
+        'very_windy': "💨 Çok windy olabilir. Açık alanda aktivite planlarınızı gözden geçirin.",
         'very_wet': "🌧️ Yağışlı olabilir. Su geçirmez ekipman ve kapalı alan alternatifleri hazırlayın.",
-        'very_uncomfortable': "💧 Nem oranı yüksek olabilir. Ferahlatıcı içecekler ve serin ortam tercih edin."
+        'very_uncomfortable': "💧 Nem oranı yüksek olabilir. Ferahlatıcı içecekler ve cool ortam tercih edin."
     }
     
     advice = "⚠️ Risk faktörleri: " + ", ".join([recommendations.get(risk, risk) for risk in high_risks])
@@ -422,7 +391,6 @@ def get_point_data_for_period(latitude, longitude, start_date_str, end_date_str,
     start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
     end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
     
-    # Tüm tarih kombinasyonlarını hazırla
     coordinates_list = []
     for single_date in daterange(start_date, end_date):
         date_str = single_date.strftime("%Y-%m-%d")
@@ -431,41 +399,33 @@ def get_point_data_for_period(latitude, longitude, start_date_str, end_date_str,
     total_operations = len(coordinates_list)
     print(f"📊 Toplam {total_operations} gün için veri işlenecek...")
     
-    # Batch işleme (daha hızlı olabilir tek nokta için)
-    batch_size = 30  # Tek nokta için daha büyük batch
+    batch_size = 30
     all_data = []
     processed = 0
     
-    # Progress tracking without tqdm (for web backend)
     for i in range(0, len(coordinates_list), batch_size):
         batch = coordinates_list[i:i + batch_size]
         
-        # Bu batch'i paralel olarak işle
         batch_results, failed_coords = fetch_data_parallel(batch, max_workers=3)
         
         all_data.extend(batch_results)
         processed += len(batch)
         
-        # Progress callback
         if progress_callback:
             progress_callback(processed, total_operations)
         
-        # Başarısız olanları logla
         if failed_coords:
             for coord, error in failed_coords:
                 print(f"⚠️ Hata: {error} at {coord[0]:.4f},{coord[1]:.4f} on {coord[2]}")
         
-        # API'ye saygı: batch'ler arası kısa bekleme
         if i + batch_size < len(coordinates_list):
             wait_time = 2 + (rate_limiter.consecutive_429s * 1)
             print(f"⏳ Batch arası {wait_time}s bekleme...")
             time.sleep(wait_time)
     
-    # İstatistikleri hesapla
     print("📈 İstatistikler hesaplanıyor...")
     stats = calculate_statistics(all_data)
     
-    # Risk analizi ekle
     risk_analysis = calculate_weather_risks(all_data)
     
     return {
@@ -485,12 +445,10 @@ def create_weather_charts(data, output_dir="static/charts"):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    # Verileri tarihe göre grupla
     date_data = defaultdict(list)
     for point in data['all_data']:
         date_data[point['date']].append(point)
     
-    # Günlük ortalamalar
     dates = []
     temp_avg = []
     wind_avg = []
@@ -501,38 +459,32 @@ def create_weather_charts(data, output_dir="static/charts"):
         points = date_data[date_str]
         dates.append(datetime.strptime(date_str, "%Y-%m-%d"))
         
-        # Günlük ortalamalar
         temp_avg.append(np.mean([p['temperature'] for p in points]))
         wind_avg.append(np.mean([p['wind_speed'] for p in points]))
         precip_avg.append(np.mean([p['precipitation'] for p in points]))
         humidity_avg.append(np.mean([p['humidity'] for p in points]))
     
-    # 4 subplot oluştur
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
     fig.suptitle('🌍 NASA POWER Hava Durumu Analizi', fontsize=16, fontweight='bold')
     
-    # Sıcaklık grafiği
     ax1.plot(dates, temp_avg, 'r-', linewidth=2, marker='o', markersize=4)
     ax1.set_title('🌡️ Sıcaklık (°C)')
     ax1.set_ylabel('Sıcaklık (°C)')
     ax1.grid(True, alpha=0.3)
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
-    # Rüzgar hızı grafiği
     ax2.plot(dates, wind_avg, 'b-', linewidth=2, marker='s', markersize=4)
     ax2.set_title('💨 Rüzgar Hızı (m/s)')
     ax2.set_ylabel('Rüzgar Hızı (m/s)')
     ax2.grid(True, alpha=0.3)
     ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
-    # Yağış grafiği
     ax3.bar(dates, precip_avg, color='skyblue', alpha=0.7, width=0.8)
     ax3.set_title('🌧️ Yağış (mm)')
     ax3.set_ylabel('Yağış (mm)')
     ax3.grid(True, alpha=0.3)
     ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
-    # Nem grafiği
     ax4.fill_between(dates, humidity_avg, alpha=0.5, color='green')
     ax4.plot(dates, humidity_avg, 'g-', linewidth=2)
     ax4.set_title('💧 Nem (%)')
@@ -540,17 +492,14 @@ def create_weather_charts(data, output_dir="static/charts"):
     ax4.grid(True, alpha=0.3)
     ax4.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     
-    # Layout düzenle
     plt.tight_layout()
     
-    # Base64 format'a çevir
     img_buffer = io.BytesIO()
     plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
     plt.close(fig)
     
-    # İstatistik grafiği
     fig2, ax = plt.subplots(figsize=(12, 8))
     stats = data['statistics']
     
@@ -574,7 +523,6 @@ def create_weather_charts(data, output_dir="static/charts"):
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # Base64 format'a çevir
     stats_buffer = io.BytesIO()
     plt.savefig(stats_buffer, format='png', dpi=300, bbox_inches='tight')
     stats_buffer.seek(0)
