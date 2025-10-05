@@ -44,7 +44,7 @@ export interface PopulationResponse {
 export class PopulationAPI {
   private baseURL: string;
 
-  constructor(baseURL: string = 'http://localhost:5000/api/population') {
+  constructor(baseURL: string = 'http://127.0.0.1:5000/api/population') {
     this.baseURL = baseURL;
   }
 

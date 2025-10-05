@@ -120,6 +120,76 @@ def health_check():
     })
 
 
+@population_bp.route('/density', methods=['POST'])
+def get_global_density():
+    """
+    Get global population density heat map data
+    Expected JSON payload:
+    {
+        "date": "YYYY-MM-DD",
+        "resolution": 2.0 (optional, grid size in degrees)
+    }
+    """
+    try:
+        data = request.json
+        
+        if not data or 'date' not in data:
+            return jsonify({'error': 'Date field is required (YYYY-MM-DD format)'}), 400
+        
+        try:
+            target_date = datetime.strptime(data['date'], '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        resolution = data.get('resolution', 2.0)
+        
+        if not (0.5 <= resolution <= 10.0):
+            return jsonify({'error': 'Resolution must be between 0.5 and 10.0 degrees'}), 400
+        
+        logger.info(f"🌍 Generating global density map for {target_date.strftime('%Y-%m-%d')}")
+        
+        # Use existing population service
+        from app.services.population_service import PopulationAnalyzer
+        service = PopulationAnalyzer()
+        
+        # Generate density data (returns list of [lat, lon, intensity] directly)
+        heat_map_data = service.get_global_population_density(
+            target_date.strftime('%Y-%m-%d'), 
+            int(resolution)
+        )
+        
+        response = {
+            'success': True,
+            'date': target_date.strftime('%Y-%m-%d'),
+            'year': target_date.year,
+            'data': heat_map_data,
+            'statistics': {
+                'total_points': len(heat_map_data),
+                'description': 'Global population density heat map'
+            },
+            'metadata': {
+                'resolution': resolution,
+                'data_points': len(heat_map_data),
+                'intensity_range': [0.0, 1.0],
+                'color_scale': {
+                    'low': 'blue (low density)',
+                    'medium': 'yellow (medium density)',
+                    'high': 'red (high density)'
+                }
+            }
+        }
+        
+        logger.info(f"✅ Generated {len(heat_map_data)} density points")
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"❌ Global density error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
 @population_bp.route('/info', methods=['GET'])
 def api_info():
     """API information endpoint"""
@@ -139,6 +209,14 @@ def api_info():
                         'center': {'lat': 41.0082, 'lon': 28.9784},
                         'radius': 50
                     }
+                }
+            },
+            '/density': {
+                'method': 'POST',
+                'description': 'Get global population density heat map',
+                'example': {
+                    'date': '2024-01-01',
+                    'resolution': 2.0
                 }
             },
             '/health': {

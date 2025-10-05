@@ -33,6 +33,8 @@ const LeafletMapUpdated = dynamic(() => import('@/components/LeafletMapUpdated')
   onZoomChange: (zoom: number) => void;
   rainLayerEnabled?: boolean;
   rainLayerOpacity?: number;
+  populationDensityData?: Array<[number, number, number]> | null;
+  showPopulationHeatMap?: boolean;
 }>;
 
 interface WeatherData {
@@ -164,9 +166,10 @@ export default function Home() {
     console.log('Date changed:', date);
   };
 
-  const handleDateConfirm = (date: Date) => {
+  const handleDateConfirm = async (date: Date) => {
     setSelectedDate(date);
     console.log('Date confirmed:', date);
+    // Date selection only - no heat map loading
   };
 
   const handleZoomIn = () => {
@@ -197,6 +200,8 @@ export default function Home() {
         rainLayerEnabled={rainLayerEnabled}
         rainLayerOpacity={rainLayerOpacity}
       />
+
+
 
       {/* UI Overlays */}
       <MapControls

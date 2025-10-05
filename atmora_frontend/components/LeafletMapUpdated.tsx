@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { MapPin } from 'lucide-react';
 
-// Dynamically import components that depend on Leaflet
 const MarkerSelector = dynamic(() => import('./MarkerSelector'), { ssr: false });
 const SquareSelector = dynamic(() => import('./SquareSelector'), { ssr: false });
 const CircleSelector = dynamic(() => import('./CircleSelector'), { ssr: false });
@@ -20,7 +19,6 @@ interface LeafletMapUpdatedProps {
   rainLayerOpacity?: number;
 }
 
-// Create the actual map component that will be dynamically loaded
 const MapComponent: React.FC<LeafletMapUpdatedProps> = ({ 
   onLocationSelect, 
   mode, 
@@ -38,7 +36,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
   const [map, setMap] = useState<any>(null);
 
   useEffect(() => {
-    // Dynamically import Leaflet and React-Leaflet
     const loadLeaflet = async () => {
       const [leafletModule, reactLeafletModule, ReactDOMServer] = await Promise.all([
         import('leaflet'),
@@ -46,7 +43,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         import('react-dom/server')
       ]);
 
-      // Import CSS - we'll handle this differently
       if (typeof window !== 'undefined') {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
@@ -56,7 +52,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
 
       const L = leafletModule.default;
       
-      // Fix for default markers in Leaflet
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -64,7 +59,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       });
 
-      // Create custom marker icon
       const iconMarkup = ReactDOMServer.renderToStaticMarkup(
         React.createElement(MapPin, { size: 32, color: "red" })
       );
@@ -90,19 +84,17 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
 
   const handleMarkerPositionChange = (pos: [number, number]) => {
     setMarkerPosition(pos);
-    handleLocationSelect(pos[1], pos[0]); // lng, lat
+    handleLocationSelect(pos[1], pos[0]); 
   };
 
   const handleShapeSelect = (center: [number, number], geometry?: any) => {
-    handleLocationSelect(center[1], center[0], geometry); // lng, lat
+    handleLocationSelect(center[1], center[0], geometry);
   };
 
-  // RainViewer API integration - MUST be before any conditional returns
   useEffect(() => {
     if (!L || !map) return;
 
     if (rainLayerEnabled) {
-      // Fetch RainViewer radar frames
       fetch('https://api.rainviewer.com/public/weather-maps.json')
         .then(response => response.json())
         .then(data => {
@@ -110,12 +102,10 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
             const latestFrame = data.radar.past[data.radar.past.length - 1];
             const tileUrl = `https://tilecache.rainviewer.com${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`;
             
-            // Remove old layer if exists
             if (rainViewerLayer) {
               map.removeLayer(rainViewerLayer);
             }
 
-            // Add new RainViewer layer
             const newLayer = L.tileLayer(tileUrl, {
               opacity: rainLayerOpacity,
               zIndex: 1000,
@@ -128,7 +118,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         })
         .catch(error => console.error('RainViewer API error:', error));
     } else {
-      // Remove layer when disabled
       if (rainViewerLayer) {
         map.removeLayer(rainViewerLayer);
         setRainViewerLayer(null);
@@ -142,7 +131,6 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
     };
   }, [rainLayerEnabled, L, map]);
 
-  // Update opacity when changed
   useEffect(() => {
     if (rainViewerLayer) {
       rainViewerLayer.setOpacity(rainLayerOpacity);
@@ -203,19 +191,19 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
         center={markerPosition}
         zoom={zoom}
         className="w-full h-full"
-        zoomControl={false} // We'll use custom controls
-        minZoom={2} // Minimum zoom level to prevent excessive zoom out
-        maxZoom={18} // Maximum zoom level
+        zoomControl={false} 
+        minZoom={2} 
+        maxZoom={18}
         maxBounds={[
-          [-90, -180], // Southwest coordinates (bottom-left)
-          [90, 180]    // Northeast coordinates (top-right)
+          [-90, -180], 
+          [90, 180] 
         ]}
-        maxBoundsViscosity={1.0} // Prevents panning outside bounds completely
+        maxBoundsViscosity={1.0} 
       >
         <TileLayer
           attribution="&copy; Esri"
           url={tileLayerUrl}
-          key={tileLayerUrl} // Force re-render when URL changes
+          key={tileLayerUrl}
         />
 
         <MapEvents />
@@ -271,7 +259,7 @@ const MapComponent: React.FC<LeafletMapUpdatedProps> = ({
   );
 };
 
-// Main component that uses dynamic import
+
 const LeafletMapUpdated: React.FC<LeafletMapUpdatedProps> = (props) => {
   const [isClient, setIsClient] = useState(false);
 
@@ -279,7 +267,7 @@ const LeafletMapUpdated: React.FC<LeafletMapUpdatedProps> = (props) => {
     setIsClient(true);
   }, []);
 
-  // Don't render map on server side
+ 
   if (!isClient) {
     return (
       <div className={`w-full h-screen flex items-center justify-center ${

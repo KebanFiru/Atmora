@@ -84,7 +84,7 @@ const PredictionForm: React.FC<PredictionFormProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [accuracyTestResults, setAccuracyTestResults] = useState<any>(null);
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

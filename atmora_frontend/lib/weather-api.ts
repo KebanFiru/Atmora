@@ -97,7 +97,7 @@ export interface StatItem {
 export class WeatherAnalysisAPI {
   private baseURL: string;
 
-  constructor(baseURL: string = 'http://localhost:5000/api/weather') {
+  constructor(baseURL: string = 'http://127.0.0.1:5000/api/weather') {
     this.baseURL = baseURL;
   }
 
