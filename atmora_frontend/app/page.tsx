@@ -7,6 +7,7 @@ import MapControls from '@/components/MapControls';
 import HeaderButtons from '@/components/HeaderButtons';
 import WeatherForm from '@/components/WeatherForm';
 import ClimateForm from '@/components/ClimateForm';
+import PredictionForm from '@/components/PredictionForm';
 import TimeScroller from '@/components/TimeScroller';
 import AboutModal from '@/components/AboutModal';
 import WeatherLayersSidebar from '@/components/WeatherLayersSidebar';
@@ -45,6 +46,7 @@ export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<{ longitude: number; latitude: number } | null>(null);
   const [isWeatherFormOpen, setIsWeatherFormOpen] = useState(false);
   const [isClimateFormOpen, setIsClimateFormOpen] = useState(false);
+  const [isPredictionFormOpen, setIsPredictionFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weatherData, setWeatherData] = useState<WeatherData | undefined>(undefined);
   const [zoomLevel, setZoomLevel] = useState(6);
@@ -140,10 +142,17 @@ export default function Home() {
         onWeatherClick={() => {
           setIsWeatherFormOpen(true);
           setIsClimateFormOpen(false);
+          setIsPredictionFormOpen(false);
         }}
         onClimateClick={() => {
           setIsClimateFormOpen(true);
           setIsWeatherFormOpen(false);
+          setIsPredictionFormOpen(false);
+        }}
+        onPredictionClick={() => {
+          setIsPredictionFormOpen(true);
+          setIsWeatherFormOpen(false);
+          setIsClimateFormOpen(false);
         }}
       />
 
@@ -194,6 +203,12 @@ export default function Home() {
       <ClimateForm
         isOpen={isClimateFormOpen}
         onClose={() => setIsClimateFormOpen(false)}
+        selectedLocation={selectedLocation}
+      />
+
+      <PredictionForm
+        isOpen={isPredictionFormOpen}
+        onClose={() => setIsPredictionFormOpen(false)}
         selectedLocation={selectedLocation}
       />
 
