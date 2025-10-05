@@ -43,29 +43,29 @@ Atmora is a comprehensive full-stack web application that integrates NASA Earth 
 
 ### Interactive World Population Visualization
 
-**Apply Date** butonu artık dünya genelindeki popülasyon yoğunluğunu interaktif heat map olarak görselleştirir!
+The Apply Date button now displays an interactive heat map showing global population density!
 
-### Özellikler:
-- 🌡️ **Renk Kodlu Görselleştirme**: 
-  - 🔵 **Mavi**: Düşük popülasyon yoğunluğu (0-50 kişi/km²)
-  - 🟢 **Yeşil**: Orta yoğunluk (50-150 kişi/km²)
-  - 🟡 **Sarı**: Yüksek yoğunluk (150-500 kişi/km²)
-  - 🔴 **Kırmızı**: Çok yüksek yoğunluk (500+ kişi/km²)
+### Features:
+- 🌡️ **Color-Coded Visualization**: 
+  - 🔵 **Blue**: Low population density (0–50 people/km²)
+  - 🟢 **Green**: Medium density (50–150 people/km²)
+  - 🟡 **Yellow**: High density (150–500 people/km²)
+  - 🔴 **Red**: Very high density (500+ people/km²)
 
-- 📊 **Nokta Bazlı Yoğunluk**: Her nokta bir grid hücresini temsil eder
-- 🗓️ **Tarih Bazlı Değişim**: Tarih değiştirerek popülasyon değişimini görebilirsiniz
-- 🌍 **Global Kapsam**: Tüm dünya genelinde 2° × 2° grid
+- 📊 **Grid-Based Density**: Each point represents a grid cell
+- 🗓️ **Date-Based Change**: See how population changes over time
+- 🌍 **Global Coverage**: 2° × 2° grid covering the entire world
 
-### Nasıl Kullanılır:
+### How to Use:
 
-1. **Sağdaki TimeScroller'da tarih seçin**
-2. **"Apply Date" butonuna tıklayın**
-3. **Heat map yükleniyor mesajını bekleyin**
-4. **Haritada renk kodlu popülasyon yoğunluğunu görüntüleyin**
-   - Zoom yaparak detaylara bakabilirsiniz
-   - Farklı tarihler seçerek değişimi gözlemleyebilirsiniz
+1. **Select a date from the TimeScroller on the right**
+2. **Click the "Apply Date" button**
+3. **Wait for the “Loading heat map” message**
+4. **View the color-coded population density map**
+   - Zoom in to explore details
+   - Select different dates to observe changes over time
 
-### Teknik Detaylar:
+### Technical Details:
 
 **Backend:**
 - Endpoint: `POST /api/population/density`
@@ -80,11 +80,11 @@ Atmora is a comprehensive full-stack web application that integrates NASA Earth 
 
 **Frontend:**
 - **leaflet.heat** plugin ile render
-- Gradient: Mavi → Cyan → Yeşil → Sarı → Kırmızı
+- Gradient: Blue → Cyan → Green → Yellow → Red
 - Radius: 25px, Blur: 35px
 - Dynamic loading ve cleanup
 
-### Veri Kaynağı:
+### Data source:
 - Simulated data based on real-world patterns
 - Urban centers (İstanbul, New York, Tokyo, vb.) ile enhanced
 - Geographic factors (latitude, coastal areas) considered 
